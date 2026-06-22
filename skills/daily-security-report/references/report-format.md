@@ -38,7 +38,12 @@ into ONE report using this exact structure. Keep the narrative body under **300 
 {Physical analysis, including the access-count table}
 ### Vulnerability detector
 {VD analysis}
+### AWS user activity
+{AWS analysis}
 ```
+
+> Per-source detail sections follow whatever sources ran; the four above are current. A source
+> that did not run is omitted here but still gets its "No findings"/"did not run" row in Findings.
 
 Rules:
 - Severity: Critical/High/Medium/Low/Info, assigned per finding.
@@ -51,7 +56,7 @@ Rules:
 Role: Tier 2 SOC engineer. Condense the Tier 3 report into ONE Slack message.
 - Slack mrkdwn: titles and bold use single asterisks (`*text*`), NOT `**text**` or `#`.
 - Exactly two sections, kept separate, do NOT merge:
-  1. `*Cyber security*` — critical findings from OpenVPN + Vulnerability detector (+ future cyber sources).
+  1. `*Cyber security*` — critical findings from OpenVPN + Vulnerability detector + AWS user activity (+ future cyber sources).
   2. `*Physical security*` — critical findings + the physical `ascii_table`.
 - All tables in ASCII (monospace) format.
 - Do NOT include recommended actions (they live in the full report).

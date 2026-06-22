@@ -16,7 +16,8 @@ pave-soc/
 ├── README.md
 └── skills/
     ├── daily-security-report/     # sub-skill (has its own MAINTAINERS.md)
-    └── alert-triage/              # sub-skill (has its own MAINTAINERS.md)
+    ├── alert-triage/              # sub-skill (has its own MAINTAINERS.md)
+    └── track-user/                # sub-skill (has its own MAINTAINERS.md)
 ```
 
 ## Load-bearing decisions (plugin-wide)
@@ -37,8 +38,10 @@ pave-soc/
   side effects, include a confirmation gate; consider `disable-model-invocation: true` to
   require explicit invocation. List it under "Skills" in README.
 - **Bump the version** in `.claude-plugin/plugin.json` (semver) on meaningful change.
-- **Repackage:** `cd pave-soc && zip -r /tmp/pave-soc.plugin . -x "*.DS_Store"` then copy to
-  the outputs dir (zip in /tmp first — writing straight to outputs can fail on permissions).
+- **Repackage:** `cd pave-soc && zip -r /tmp/pave-soc.plugin . -x "*.DS_Store" -x "*__pycache__*" -x "*.pyc" -x ".git/*"`
+  then copy to the outputs dir (zip in /tmp first — writing straight to outputs can fail on
+  permissions). The excludes matter: without `.git/*` the whole repo history ships in the
+  plugin, and `__pycache__`/`*.pyc` bundle stale bytecode.
 
 ## Changelog
 - 2026-06-21 — Plugin created. `daily-security-report` ported from the n8n "Daily security
@@ -48,3 +51,15 @@ pave-soc/
   (Investigator → Query agent → Threat Hunter) as real subagents; input by alert id, full-alert
   fetch via OpenSearch MCP, verdict in chat (no Slack), optional ISO 27001 incident report
   drafted locally then published to Confluence behind a confirm gate. See its MAINTAINERS.md.
+- 2026-06-22 — Added plugin-wide `CHANGELOG.md`, consolidated from the per-asset MAINTAINERS.md
+  changelogs (plugin root + both skills). Docs-only; no behavior change.
+- 2026-06-22 — `daily-security-report` v0.3.0: added an "AWS user activity" source (Control
+  Tower CloudTrail via the CloudWatch MCP) and generalized the source registry with a per-source
+  `backend` field (`opensearch` | `cloudwatch`). Introduces a second collection backend alongside
+  OpenSearch. See the skill's MAINTAINERS.md for the CloudTrail gotchas. Version bumped to 0.3.0.
+- 2026-06-22 — Added `track-user` skill (v0.4.0; initially named `user-activity`, renamed same
+  day). Single-user, read-only AWS activity tracker: queries Control Tower CloudTrail (CloudWatch
+  MCP) for a named user over a window (default last 7 days) and writes a chronological UTC+7
+  timeline log to the workspace folder. Shares CloudTrail mechanics with the daily report's AWS
+  source but is per-user (never org-wide) and does not publish externally. See its MAINTAINERS.md.
+  Version bumped to 0.4.0.

@@ -19,20 +19,26 @@ consume whatever modules ran. Adding a source = one entry in `references/sources
 source list below.
 
 ## Required MCP servers
-- **OpenSearch** — query Wazuh alert indices (`GenericOpenSearchApiTool`).
+- **OpenSearch** — query Wazuh alert indices (`GenericOpenSearchApiTool`); used by sources 1–3.
+- **CloudWatch** (`awslabs.cloudwatch-mcp-server`) — query Control Tower CloudTrail logs
+  (`execute_log_insights_query`); used by the AWS source.
 - **Atlassian Rovo** — read operation notes + create Confluence pages.
 - **Slack** — post the summary.
 Analysis and CVE web-search are done natively; no LLM/search MCP needed.
 
-If any server is unavailable, stop and tell the user which one — do not fabricate data.
+If a required server is unavailable, stop and tell the user which one — do not fabricate data.
+A server is required only if a source that uses it is in the run; if just the CloudWatch
+server is down, you may still run the OpenSearch sources and note AWS was skipped.
 
 ## Sources (current)
 1. OpenVPN
 2. Physical access
 3. Vulnerability detector
+4. AWS user activity
 
-Each source's query, operation note, pre-processing, and analysis spec are in
-`references/sources.md`. Read that file before collecting.
+Each source declares a **backend** (`opensearch` or `cloudwatch`) and carries its query,
+operation note, pre-processing, and analysis spec in `references/sources.md`. Read that file
+before collecting.
 
 ## Workflow
 
@@ -50,9 +56,13 @@ user for a valid `YYYY-MM-DD` date before doing anything else.
 
 ### 2. Per source (do for each source in the list above)
 Follow `references/sources.md`:
-1. **Collect** — run the source's OpenSearch query with `{{START}}`/`{{END}}` substituted,
-   paginating with `search_after` until all hits are gathered. Save hits to
-   `/tmp/<source>_hits.json`.
+1. **Collect** — run the source's query with `{{START}}`/`{{END}}` substituted, by backend:
+   - `opensearch` → the OpenSearch query body, paginating with `search_after` until all hits
+     are gathered.
+   - `cloudwatch` → one `execute_log_insights_query` call (region `ca-central-1`, the log
+     group, `{{START}}`/`{{END}}` as `start_time`/`end_time`, a `limit`). No `search_after`;
+     if the row count hits the limit, re-run wider and note truncation.
+   Save results to `/tmp/<source>_hits.json`.
 2. **Operation note** — if the source has one, read that Confluence page (markdown).
 3. **Pre-process** — if the source has a script (Physical → `scripts/physical_count.py`),
    run it and keep its output.
@@ -94,8 +104,9 @@ Tell the user: report_id, sources that ran, the Confluence parent link, and that
 message was posted.
 
 ## Notes
-- Times in all output are UTC+7. OpenVPN/VD `timestamp` and Physical `data.timestamp` are
-  stored in UTC; the range filters use UTC+7 ISO offsets so this is handled at query time,
-  but the Physical analysis must also convert displayed event times to UTC+7.
+- Times in all output are UTC+7. OpenVPN/VD `timestamp`, Physical `data.timestamp`, and AWS
+  CloudTrail `eventTime` are all stored/returned in UTC; the query windows use UTC+7 ISO
+  offsets so collection is correct, but the Physical and AWS analyses must convert displayed
+  event times to UTC+7.
 - Confluence write + Slack post are the only external-write actions, and both are gated
   behind the mandatory user confirmation in Step 4 (see publishing.md).

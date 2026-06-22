@@ -15,10 +15,21 @@ new sub-skills (e.g. `triage`) drop in under `skills/` without touching existing
   drafts and publishes an ISO 27001 incident report to Confluence.
   - Invoke with **`/alert-triage <alert-id>`** (e.g. `/alert-triage 1750412345.6789012`). Claude
     can also invoke it when you ask to triage/investigate an alert by id.
+- **track-user** — Tracks a single named AWS user's activity over a time window from Control
+  Tower CloudTrail (via the CloudWatch MCP) and writes a chronological UTC+7 timeline log
+  (sign-ins, mutating actions, errors) as Markdown in the workspace folder. Read-only; requires
+  a named user (never org-wide).
+  - Invoke with **`/track-user <username> [window]`** — e.g. `/track-user huy.nguyen`,
+    `/track-user huy.nguyen 14`, or `/track-user huy.nguyen 2026-06-01 2026-06-22`. Window
+    defaults to the **last 7 days**. Claude can also invoke it when you ask to track/audit what a
+    specific person did in AWS.
 
 ## Required connectors (MCP)
-- **OpenSearch** — query Wazuh alert indices (both skills)
-- **Atlassian Rovo** — read operation notes + create Confluence pages (both skills)
+- **OpenSearch** — query Wazuh alert indices (daily-security-report, alert-triage)
+- **AWS CloudWatch** (`awslabs.cloudwatch-mcp-server`) — query Control Tower CloudTrail
+  (daily-security-report AWS source, track-user)
+- **Atlassian Rovo** — read operation notes + create Confluence pages (daily-security-report,
+  alert-triage)
 - **Slack** — post the daily-report summary (daily-security-report only)
 
 Analysis and CVE web-search are handled natively by Claude; no LLM/search MCP is required.
@@ -32,10 +43,14 @@ pave-soc/
     │   ├── SKILL.md
     │   ├── references/   (sources, report-format, publishing)
     │   └── scripts/      (report_period.py, physical_count.py)
-    └── alert-triage/
+    ├── alert-triage/
+    │   ├── SKILL.md
+    │   ├── references/   (alert-query, agent-chain, incident-report, publishing)
+    │   └── template/     (incident-report-template.md — from the official PDF)
+    └── track-user/
         ├── SKILL.md
-        ├── references/   (alert-query, agent-chain, incident-report, publishing)
-        └── template/     (incident-report-template.md — from the official PDF)
+        ├── references/   (activity-query, timeline-format)
+        └── scripts/      (activity_window.py)
 ```
 
 ## Adding a sub-skill later

@@ -1,9 +1,9 @@
 {
   "name": "pave-soc",
-  "version": "0.2.0",
-  "description": "PAVE/DLVN SOC automation. Bundles SOC skills (daily security reporting, alert triage, with more to come) backed by OpenSearch, Atlassian, and Slack.",
+  "version": "0.4.0",
+  "description": "PAVE/DLVN SOC automation. Bundles SOC skills (daily security reporting, alert triage, user activity tracking, with more to come) backed by OpenSearch, AWS CloudWatch, Atlassian, and Slack.",
   "author": {
     "name": "DLVN Security Engineering"
   },
-  "keywords": ["soc", "security", "wazuh", "opensearch", "soc2"]
+  "keywords": ["soc", "security", "wazuh", "opensearch", "cloudtrail", "aws", "soc2"]
 }

@@ -14,6 +14,7 @@ Order:
    - `OpenVPN {date}` — OpenVPN analysis
    - `Physical access {date}` — Physical analysis (with count table)
    - `Vulnerability detector {date}` — VD analysis
+   - `AWS user activity {date}` — AWS CloudTrail analysis
    (Future sources add their own child page automatically.)
 
 ## Slack (Slack MCP)
