@@ -1,6 +1,6 @@
 {
   "name": "pave-soc",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "PAVE/DLVN SOC automation. Bundles SOC skills (daily security reporting, alert triage, user activity tracking, with more to come) backed by OpenSearch, AWS CloudWatch, Atlassian, and Slack.",
   "author": {
     "name": "DLVN Security Engineering"

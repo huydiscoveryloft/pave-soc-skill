@@ -1,7 +1,8 @@
 # track-user — Maintainer's Note
 
 Read this with `SKILL.md` before editing. It records intent and the decisions a change must not
-silently break. **Rule: every change appends a line to the Changelog below.**
+silently break. **Rule: record every change in the plugin-wide `CHANGELOG.md` (repo root) —
+not here. This note holds intent and decisions only, no change history.**
 
 ## Origin
 Built to turn DLVN/PAVE's hand-written runbook for querying user activity from Control Tower
@@ -73,16 +74,5 @@ If the CloudTrail query mechanics (gotchas, region) ever change, update **both**
   `daily-security-report/references/publishing.md` targets.
 - **Different window semantics:** edit `scripts/activity_window.py`.
 
-## Changelog
-- 2026-06-22 — Initial build (v0.1.0 of the skill). Single-user, read-only CloudTrail timeline
-  via the CloudWatch MCP; `activity_window.py` (default last 7 days); query recipes + timeline
-  output contract. Saves a Markdown timeline log to the workspace folder; no external writes.
-  Plugin bumped to 0.4.0.
-- 2026-06-22 — Dry run against `thien.tranduy` (last 7 days) confirmed the procedure end-to-end:
-  11 successful SSO sign-ins, 9 mutating actions (Secrets Manager + an RDS restore→modify→delete
-  lifecycle), 1 real error (`ModifyDBInstance` `InvalidDBInstanceStateFault`); ~75 benign
-  not-enabled-service probes (`freetier`/`devops-guru`/`securityhub`) dominated the error query.
-- 2026-06-22 — Renamed the skill `user-activity` → `track-user` (slash `/track-user`); directory,
-  frontmatter `name`, and all docs updated. Removed pointers to the external activity-querying
-  runbook (being retired); `references/activity-query.md` is now the self-contained source of
-  truth for the query mechanics. No behavior change.
+## Change history
+Recorded in the plugin-wide `CHANGELOG.md` at the repo root.

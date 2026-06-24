@@ -38,7 +38,7 @@ Plugin (pave-soc)
 | `references/publishing.md` | Sink configuration: Confluence cloudId/space/parent, Slack channel, write format. |
 | `scripts/report_period.py` | Pure function → reporting window (UTC+7) from optional `YYYY-MM-DD`, default yesterday. |
 | `scripts/physical_count.py` | Pure function → per-device access tally (markdown + ASCII tables) from collected hits. |
-| `MAINTAINERS.md` (×2) | Intent, load-bearing decisions, extension recipes, changelog. |
+| `MAINTAINERS.md` (×2) | Intent, load-bearing decisions, extension recipes. Change history lives in the plugin-wide `CHANGELOG.md`. |
 
 Separation of concerns: **`SKILL.md` = control flow**, **`references/*` = declarative data
 (what to query, how to format, where to publish)**, **`scripts/*` = deterministic compute**,

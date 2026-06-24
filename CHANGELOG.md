@@ -2,10 +2,19 @@
 
 All notable changes to the `pave-soc` plugin and its skills.
 
-This file is consolidated from the per-asset `MAINTAINERS.md` changelogs (plugin root,
-`skills/daily-security-report/`, `skills/alert-triage/`). For the *why* behind each change,
-read the corresponding `MAINTAINERS.md`. Format loosely follows Keep a Changelog; versions
-track `.claude-plugin/plugin.json`.
+This is the **single source of truth** for change history across the plugin and all skills; the
+per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *why* behind each
+change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
+Keep a Changelog; versions track `.claude-plugin/plugin.json`.
+
+## [0.5.1] — 2026-06-24
+
+### Docs
+- **Consolidated all change history into this `CHANGELOG.md`.** Removed the `## Changelog`
+  section from every `MAINTAINERS.md` (plugin root + `daily-security-report`, `alert-triage`,
+  `track-user`) and updated their "every change appends a line to the Changelog below" rule to
+  point here instead. MAINTAINERS.md files now hold intent and decisions only. Updated
+  `ARCHITECT.md` accordingly. Docs-only; no behavior change.
 
 ## [0.5.0] — 2026-06-24
 
