@@ -69,17 +69,39 @@ Follow `references/sources.md`:
 4. **Analyze** — produce a markdown analysis per the source's analysis spec. Label it with
    the source name. (VD requires a web search per CVE.)
 
-Keep each source independent — if one source's collection fails, note it and continue; the
-report records which sources ran.
+**Malfunction halt (do NOT silently continue).** Treat a source as *malfunctioning* if its
+collection step **errors/times out** OR returns **zero hits**. A malfunction is a stop
+condition — do not run the rest of the workflow on a partial dataset:
+- **Interactive run:** stop immediately and tell the user which source malfunctioned and why
+  (error message, or zero hits for the window). Ask whether to (a) continue without that
+  source, (b) retry it, or (c) abort. Only proceed once the user chooses. If they choose to
+  continue, note the source as skipped in the report.
+- **Scheduled / non-interactive run:** do NOT publish. Skip Steps 3–6 and **send a Slack DM to
+  the maintainer** (`huy.nguyen@discoveryloft.com`) briefing what happened. Resolve the user id
+  with `slack_search_users` (query the email), then `slack_send_message` with that user id as
+  `channel_id`. Keep the brief minimal — only: report id + date, a halted/nothing-published
+  status line, and the malfunctioning source(s) with the reason (error message or "0 hits for
+  the window"). Do NOT list healthy sources, explain why the DM was sent, or suggest next steps.
+  Use the exact template in `references/publishing.md`. Then report the run as halted awaiting
+  review.
+
+(Zero hits is treated as a malfunction here because, for these sources, an empty day usually
+means stalled ingestion rather than genuine silence — cf. the 2026-06-19 ingestion stall.)
 
 ### 3. Tier 3 — fuse into the daily report
 Read `references/report-format.md`. Combine the labeled per-source analyses into one
 SOC 2-aligned report using the exact template (metadata header, findings table with
 severity + disposition, per-source detail). This markdown is the parent-page body.
 
-### 4. Confirm before publishing (MANDATORY GATE)
-Do NOT create any Confluence page or post to Slack until the user explicitly approves.
-Present to the user, in chat:
+### 4. Confirm before publishing (GATE)
+**Scheduled run (Cowork scheduled task / non-interactive):** publishing is **auto-approved** —
+proceed straight to Steps 5–6 *only if every source was healthy* (Step 2 found no malfunction).
+This auto-approval applies solely to publishing a clean, complete report; it does **not**
+override the Step 2 malfunction halt. If any source malfunctioned, you already stopped in
+Step 2 — do not publish.
+
+**Interactive run:** do NOT create any Confluence page or post to Slack until the user
+explicitly approves. Present to the user, in chat:
 - the finalized Tier 3 report (the Confluence parent-page body) and each per-source child
   page's content;
 - a preview of the Slack message (Tier 2 — draft it now per `references/report-format.md`,
@@ -88,8 +110,7 @@ Present to the user, in chat:
   + N child pages in space 20480022, and post 1 message to #wazuh-ai-report."
 
 Then wait for a clear yes. If the user requests changes, revise and re-present. Only continue
-once they confirm. If the run is non-interactive (e.g. scheduled) and no one can confirm, do
-NOT publish — save the drafts and report that the run is awaiting approval.
+once they confirm.
 
 ### 5. Publish (only after approval)
 Read `references/publishing.md`. Create the Confluence **parent page** (capture its `id`
@@ -108,5 +129,7 @@ message was posted.
   CloudTrail `eventTime` are all stored/returned in UTC; the query windows use UTC+7 ISO
   offsets so collection is correct, but the Physical and AWS analyses must convert displayed
   event times to UTC+7.
-- Confluence write + Slack post are the only external-write actions, and both are gated
-  behind the mandatory user confirmation in Step 4 (see publishing.md).
+- Confluence write + Slack post are the only external-write actions. In an interactive run
+  both are gated behind the user confirmation in Step 4; in a scheduled run they are
+  auto-approved, but only when every source was healthy (a Step 2 malfunction always halts
+  publishing). See publishing.md.

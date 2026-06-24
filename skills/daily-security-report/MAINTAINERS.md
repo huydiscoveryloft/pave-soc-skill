@@ -32,9 +32,20 @@ any external write. Files:
    paginates with `search_after` via `GenericOpenSearchApiTool` (full body: `query` + `sort`
    on the source's time field + `_id`, repeat until <100 hits). Never assume one call returns
    everything.
-4. **Step 4 confirm gate is mandatory.** Never create Confluence pages or post to Slack before
-   explicit user approval. Non-interactive/scheduled run with no approver → do NOT publish;
-   save drafts and report "awaiting approval."
+4. **Step 4 publish gate — interactive vs scheduled.** *Interactive* runs require explicit
+   user approval before any Confluence/Slack write. *Scheduled / non-interactive* runs (Cowork
+   scheduled task) **auto-approve** publishing — but only when every source was healthy. The
+   auto-approval covers a clean, complete report only; it never overrides the Step 2 malfunction
+   halt. (Before 2026-06-24 the scheduled branch did NOT publish at all; this was deliberately
+   changed so unattended runs distribute the report.)
+4b. **Malfunction halt (Step 2).** A source is "malfunctioning" if its collection errors/times
+   out OR returns **zero hits** (empty days here usually mean stalled ingestion, not silence —
+   cf. 2026-06-19). On malfunction, do not run the rest of the pipeline on partial data:
+   interactive → stop and ask the user (continue-without / retry / abort); scheduled → do NOT
+   publish, **DM the maintainer** `huy.nguyen@discoveryloft.com` (resolve via `slack_search_users`,
+   send via `slack_send_message` with the user id as `channel_id`) a brief of what happened
+   (report id, malfunctioning + healthy sources, reason, nothing published), report run halted.
+   This reverses the old "note it and continue" behavior.
 5. **Physical count is deterministic (`physical_count.py`).** Known devices always shown
    (Cổng trước, Lock F2/F3/F4); unknown devices/results auto-added. `markdown_table` → report,
    `ascii_table` → Slack.
@@ -107,3 +118,20 @@ any external write. Files:
   via IAM Identity Center, so their role-session-name is their `@discoveryloft.com` email.
   Caveat documented inline: this excludes direct IAM-user/root console logins (no
   `discoveryloft.com` in ARN) — check those separately via `userIdentity.type`.
+- 2026-06-24 — Step 2 **malfunction halt**: a source that errors/times out OR returns zero hits
+  now halts the workflow instead of "note it and continue" — interactive runs ask the user
+  (continue-without / retry / abort), scheduled runs skip publishing and post a Slack alert.
+  Updated decision #4b, SKILL.md Step 2, and the Notes.
+- 2026-06-24 — Step 4 **scheduled auto-approve**: scheduled/non-interactive runs now auto-approve
+  publishing (previously they did NOT publish), but only when every source was healthy — the
+  malfunction halt still blocks publishing. Interactive runs are unchanged (still require explicit
+  approval). Updated decision #4, SKILL.md Step 4, and the Notes.
+- 2026-06-24 — Scheduled-halt **maintainer DM**: when a scheduled run halts on a Step 2
+  malfunction it now DMs `huy.nguyen@discoveryloft.com` a brief (instead of posting to the
+  report channel). Resolve the user id via `slack_search_users`, send via `slack_send_message`.
+  Verified the email resolves to user `U09039DBUF9`. Updated SKILL.md Step 2, decision #4b, and
+  added a "Maintainer DM" section to `references/publishing.md`.
+- 2026-06-24 — Trimmed the maintainer-DM brief to a fixed minimal template (report id + date,
+  halted status, malfunctioning source(s) + reason only). Dropped healthy-source list, the
+  "why you're getting this" line, and next-step suggestions per maintainer review. Template now
+  lives in `references/publishing.md`; SKILL.md Step 2 points to it.

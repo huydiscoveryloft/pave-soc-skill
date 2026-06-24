@@ -63,3 +63,8 @@ pave-soc/
   timeline log to the workspace folder. Shares CloudTrail mechanics with the daily report's AWS
   source but is per-user (never org-wide) and does not publish externally. See its MAINTAINERS.md.
   Version bumped to 0.4.0.
+- 2026-06-24 — `daily-security-report` v0.5.0: (1) source malfunction (collection error or zero
+  hits) now halts the run instead of note-and-continue; (2) scheduled/non-interactive runs
+  auto-approve the Step 4 publish gate when all sources are healthy (previously they never
+  published); (3) scheduled halts DM the maintainer a minimal brief instead of staying silent.
+  See the skill's MAINTAINERS.md. Version bumped to 0.5.0.

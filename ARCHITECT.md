@@ -120,9 +120,11 @@ cloud, so the OpenSearch endpoint must be publicly reachable.
   also auto-invoke it from a matching natural-language request (no separate command file).
 - **Date parameter:** optional `YYYY-MM-DD` argument (via `$ARGUMENTS` or stated in the
   request) → passed to `report_period.py`; absent → yesterday (UTC+7). Malformed → halt and ask.
-- **Side-effect safety:** step 4 is a hard gate; nothing is written before approval. A
-  non-interactive/scheduled run with no approver does **not** publish — it saves drafts and
-  reports "awaiting approval."
+- **Side-effect safety:** step 4 gates all external writes. *Interactive* runs require explicit
+  user approval before publishing. *Scheduled/non-interactive* runs **auto-approve** publishing,
+  but only when every source was healthy. A source malfunction (collection error or zero hits)
+  halts the workflow at step 2 — interactive runs ask the user; scheduled runs skip publishing,
+  post a Slack alert, and report the run halted.
 
 ## 8. Extension points
 - **New source:** add an entry in `references/sources.md` + the source list in `SKILL.md`.
@@ -138,6 +140,8 @@ cloud, so the OpenSearch endpoint must be publicly reachable.
 - Reporting window is UTC+7; alert times are stored UTC and converted at query time (physical
   analysis converts displayed times too).
 - OpenSearch returns ≤100 hits/call → collection must paginate.
-- The confirm gate before external writes is mandatory.
+- External writes are gated at step 4: interactive runs require user approval; scheduled runs
+  auto-approve only when all sources are healthy. A source malfunction (error or zero hits)
+  halts the run before publishing.
 - Physical counts come from `physical_count.py` (deterministic), not ad-hoc tallying.
 - VD analysis must web-search each CVE for active-exploitation evidence.

@@ -7,6 +7,27 @@ This file is consolidated from the per-asset `MAINTAINERS.md` changelogs (plugin
 read the corresponding `MAINTAINERS.md`. Format loosely follows Keep a Changelog; versions
 track `.claude-plugin/plugin.json`.
 
+## [0.5.0] — 2026-06-24
+
+### Changed
+- **`daily-security-report`: source malfunction now halts the run.** A source whose collection
+  errors/times out **or returns zero hits** is treated as malfunctioning and stops the workflow
+  (was "note it and continue"). Interactive runs ask the user (continue-without / retry / abort);
+  scheduled runs skip publishing. Zero hits counts as a malfunction because, for these sources,
+  an empty day usually means stalled ingestion (cf. the 2026-06-19 stall).
+- **`daily-security-report`: scheduled runs auto-approve publishing.** A Cowork scheduled /
+  non-interactive run now auto-approves the Step 4 publish gate and distributes the report —
+  but only when every source was healthy (previously scheduled runs never published). The
+  malfunction halt always overrides auto-approval. Interactive runs are unchanged (explicit
+  approval still required).
+
+### Added
+- **`daily-security-report`: scheduled-halt maintainer DM.** When a scheduled run halts on a
+  malfunction, it DMs the maintainer (`huy.nguyen@discoveryloft.com`, resolved via
+  `slack_search_users`) a minimal brief — report id + date, halted/nothing-published status, and
+  the malfunctioning source(s) with the reason. Template lives in
+  `skills/daily-security-report/references/publishing.md`.
+
 ## [0.4.0] — 2026-06-22
 
 ### Added
