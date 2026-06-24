@@ -1,7 +1,8 @@
 # daily-security-report — Maintainer's Note
 
 Read this with `SKILL.md` before editing. It captures intent and the decisions a change must
-not silently break. **Rule: every change appends a line to the Changelog below.**
+not silently break. **Rule: record every change in the plugin-wide `CHANGELOG.md` (repo root) —
+not here. This note holds intent and decisions only, no change history.**
 
 ## Origin
 Ported from the n8n workflow "Daily security report" (HTTP nodes → MCP). The original's GCP
@@ -93,45 +94,5 @@ any external write. Files:
 - **Change the report structure / SOC 2 fields:** edit the Tier 3 template in
   `references/report-format.md` (single source of truth for the format).
 
-## Changelog
-- 2026-06-21 — Initial build from n8n export; HTTP→MCP (OpenSearch/Atlassian/Slack);
-  GCP branches removed; UTC+7 windowing via `report_period.py`; `search_after` pagination;
-  `physical_count.py` ported.
-- 2026-06-21 — Fixed Physical `_source.excludes` to add `@timestamp` + `timestamp` (match original).
-- 2026-06-21 — Added optional `YYYY-MM-DD` date param (default yesterday).
-- 2026-06-21 — Adopted option-3 slash (`/daily-security-report`); removed the `/daily-report` command.
-- 2026-06-21 — Added mandatory pre-publish confirmation gate (Step 4).
-- 2026-06-22 — Generalized the source registry with a per-source `backend` field
-  (`opensearch` | `cloudwatch`); scoped `search_after` pagination to the opensearch backend.
-- 2026-06-22 — Added source #4 "AWS user activity" (Control Tower CloudTrail via CloudWatch MCP
-  `execute_log_insights_query`, region `ca-central-1`, log group `aws-controltower/CloudTrailLogs`):
-  collects the day's mutating actions (`readOnly = 0`) across all users + console sign-ins, with
-  the numeric-`readOnly` / identity-in-ARN gotchas encoded inline. Wired into SKILL.md (required
-  servers, source list, backend-aware Step 2), report-format.md (Tier 3 detail + Tier 2 Cyber
-  section), and publishing.md (AWS child page). Verified the CloudWatch query against the live
-  log group during build.
-- 2026-06-22 — AWS source: added a **load-bearing human-identity filter**
-  `userIdentity.arn like /discoveryloft.com/` to the collect query, and changed scope from "all
-  users" to "all DLVN/PAVE human identities". Dry run for 2026-06-21 showed the unfiltered
-  `readOnly = 0` query returns 83,578 rows/day (almost all SSM/EKS service-principal
-  automation); with the filter it returns 5 (the actual human activity). Org humans authenticate
-  via IAM Identity Center, so their role-session-name is their `@discoveryloft.com` email.
-  Caveat documented inline: this excludes direct IAM-user/root console logins (no
-  `discoveryloft.com` in ARN) — check those separately via `userIdentity.type`.
-- 2026-06-24 — Step 2 **malfunction halt**: a source that errors/times out OR returns zero hits
-  now halts the workflow instead of "note it and continue" — interactive runs ask the user
-  (continue-without / retry / abort), scheduled runs skip publishing and post a Slack alert.
-  Updated decision #4b, SKILL.md Step 2, and the Notes.
-- 2026-06-24 — Step 4 **scheduled auto-approve**: scheduled/non-interactive runs now auto-approve
-  publishing (previously they did NOT publish), but only when every source was healthy — the
-  malfunction halt still blocks publishing. Interactive runs are unchanged (still require explicit
-  approval). Updated decision #4, SKILL.md Step 4, and the Notes.
-- 2026-06-24 — Scheduled-halt **maintainer DM**: when a scheduled run halts on a Step 2
-  malfunction it now DMs `huy.nguyen@discoveryloft.com` a brief (instead of posting to the
-  report channel). Resolve the user id via `slack_search_users`, send via `slack_send_message`.
-  Verified the email resolves to user `U09039DBUF9`. Updated SKILL.md Step 2, decision #4b, and
-  added a "Maintainer DM" section to `references/publishing.md`.
-- 2026-06-24 — Trimmed the maintainer-DM brief to a fixed minimal template (report id + date,
-  halted status, malfunctioning source(s) + reason only). Dropped healthy-source list, the
-  "why you're getting this" line, and next-step suggestions per maintainer review. Template now
-  lives in `references/publishing.md`; SKILL.md Step 2 points to it.
+## Change history
+Recorded in the plugin-wide `CHANGELOG.md` at the repo root.

@@ -1,7 +1,8 @@
 # alert-triage — Maintainer's Note
 
 Read this with `SKILL.md` before editing. It captures intent and the decisions a change must
-not silently break. **Rule: every change appends a line to the Changelog below.**
+not silently break. **Rule: record every change in the plugin-wide `CHANGELOG.md` (repo root) —
+not here. This note holds intent and decisions only, no change history.**
 
 ## Origin
 Ported from the n8n workflow **"Tier-1 operator"** (Slack-triggered alert triage). The user
@@ -91,16 +92,5 @@ Files:
 - **Re-add Slack delivery:** add a Slack post step after Step 4 and reinstate the mrkdwn
   conversion rules in the Threat Hunter prompt.
 
-## Changelog
-- 2026-06-21 — Initial build. Ported the "Tier-1 operator" agent chain (Investigator → Query
-  agent → Threat Hunter) as real subagents; switched input to alert-id + OpenSearch MCP for the
-  full-alert fetch; verdict returned in chat (no Slack). Added optional ISO 27001 incident
-  report (local draft → Confluence publish under parent `223773037`, gated by confirmation).
-- 2026-06-21 — Replaced the hand-authored report template with
-  `template/incident-report-template.md`, transcribed verbatim from the official PAVE incident
-  report PDF (`OPENAPI-INC-2026-001`). `references/incident-report.md` now holds only
-  field-derivation guidance and points to the template.
-- 2026-06-21 — Trial run on alert `1781758278.30199963` (RDP, rule 92658) confirmed the chain
-  end-to-end → False Positive. Made Step 5 verdict-driven: False Positive yields an advisory
-  rule-tuning recommendation and no report; only True Positive / Inconclusive offer an incident
-  report. (decision 5a)
+## Change history
+Recorded in the plugin-wide `CHANGELOG.md` at the repo root.
