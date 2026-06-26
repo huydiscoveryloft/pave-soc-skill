@@ -8,8 +8,8 @@ description: >-
   "audit", "review", or "build a timeline of" what a specific person did in AWS — what they
   changed, or when and where they signed in. Requires a named user and never runs org-wide;
   defaults to the last 7 days. Queries aws-controltower/CloudTrailLogs in ca-central-1, assembles
-  sign-ins and mutating actions into a UTC+7 timeline, and saves it as a Markdown log in the
-  workspace folder.
+  sign-ins and mutating actions into a UTC+7 timeline, then rewrites it as a final human-friendly
+  readable report — both saved as Markdown in the workspace folder.
 disable-model-invocation: false
 ---
 
@@ -40,8 +40,10 @@ If the CloudWatch MCP is unavailable, stop and tell the user — do not fabricat
 ## Reference files (read before the matching step)
 - `references/activity-query.md` — the CloudWatch query recipes, region/log-group, identity
   token, and the CloudTrail gotchas. **Load before Step 3.**
-- `references/timeline-format.md` — the output contract for the timeline log. **Load before
-  Step 5.**
+- `references/timeline-format.md` — the output contract for the technical timeline log. **Load
+  before Step 5.**
+- `references/readable-report.md` — the output contract for the final human-friendly report.
+  **Load before Step 6.**
 
 ## Workflow
 
@@ -86,15 +88,26 @@ flags), and Notes & caveats. Convert all `eventTime` (UTC) to **UTC+7**. Resolve
 human via the role-session-name in the ARN. Call out security-sensitive changes (IAM, security
 groups, networking, CloudTrail/Config, new instances, secrets) and any denied/error actions.
 
-Write it to the **workspace folder** as `UA-<user>-<window_id>.md`. Present a short summary in
-chat and share the file.
+Write it to the **workspace folder** as `UA-<user>-<window_id>.md`. This is the technical log
+(the working artifact), not the final deliverable.
 
-### 6. Report back
+### 6. Write the human-friendly report
+Read `references/readable-report.md`, then **re-read the technical timeline log from Step 5** and
+rewrite it as a plain-language narrative for a human reader. **Decouple actions** — one action
+per line, each as a self-contained "User …" sentence that states the intent and the outcome
+(including denials/errors in plain words), keeping the concrete identifiers (account, IP, resource
+id, bucket, region) inline. Reuse the UTC+7 times already in the log; add no new facts.
+
+Write it to the **workspace folder** as `UA-<user>-<window_id>-readable.md`. This is the final
+deliverable — present a short summary in chat and share this file.
+
+### 7. Report back
 Summarize: who was tracked, the window, event counts (sign-ins / mutating / errors), any
-security-sensitive actions or unfamiliar source IPs, and the path to the saved timeline log.
+security-sensitive actions or unfamiliar source IPs, and the paths to both the technical log and
+the readable report.
 
 ## Side-effect safety
-Read-only against AWS — all four queries are reads via the CloudWatch MCP. The only write is the
-local Markdown timeline log in the workspace folder (no external publish, no confirmation gate
-required). If a future variant publishes to Confluence/Slack, add a confirmation gate per the
-plugin-wide rule.
+Read-only against AWS — all four queries are reads via the CloudWatch MCP. The only writes are the
+local Markdown logs (technical timeline + readable report) in the workspace folder (no external
+publish, no confirmation gate required). If a future variant publishes to Confluence/Slack, add a
+confirmation gate per the plugin-wide rule.

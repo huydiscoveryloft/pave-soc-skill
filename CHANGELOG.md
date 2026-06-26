@@ -7,6 +7,22 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [0.6.0] — 2026-06-24
+
+### Added
+- **`track-user`: final human-friendly readable report.** After building the technical timeline
+  log, the skill now re-reads it and rewrites it as a plain-language narrative (Step 6, before
+  report-back). Actions are **decoupled** — one "User …" sentence per line stating intent and
+  outcome (denials/errors included), identifiers inline. Saved as
+  `UA-<user>-<window_id>-readable.md` and presented as the final deliverable; the technical log
+  becomes the working artifact. New contract in `references/readable-report.md`.
+
+### Fixed
+- **`track-user`: timeline entries now render as separate lines.** Both format specs
+  (`timeline-format.md`, `readable-report.md`) now require a blank line between every entry (and
+  between the readable report's two header lines). Without it, Markdown collapsed the timeline
+  into one run-on paragraph.
+
 ## [0.5.1] — 2026-06-24
 
 ### Docs
