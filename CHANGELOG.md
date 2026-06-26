@@ -7,6 +7,35 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [0.7.0] — 2026-06-26
+
+### Added
+- **New skill: `aws-firewall-review`.** Generates the DLVN/PAVE quarterly AWS firewall
+  configuration review. Collects all AWS security groups across every enabled region, applies
+  deterministic risk analysis (internet-exposed sensitive ports, wide CIDR ranges, permissive
+  egress), then renders a findings-focused markdown report from the DLVN-SEC-TPL-002 template.
+  The collect and render halves can run independently. Registered in the plugin description.
+- **`aws-firewall-review`: Dockerised MCP collector.** Collection runs through the
+  `aws-firewall-review` MCP server (stdio, launched via `docker run -i`) instead of a standalone
+  CLI. The container reads the host's `~/.aws` mounted read-only, so credentials never pass
+  through chat. Tools: `collect_security_groups(profiles?, regions?, workers?)`,
+  `list_aws_profiles()`, `whoami(profile?)`. The server source lives in the `mcp_server/`
+  directory at the project root, kept separate from the plugin so the skill source stays clean.
+- **`aws-firewall-review`: SSO + multi-account, all-or-nothing.** `collect_security_groups`
+  defaults to the standard review set — `development`, `uat`, `production` — resolving SSO cached
+  tokens natively, and returns one evidence object per account under `accounts[]`. Every profile
+  is authenticated up front; if any fails (e.g. an expired SSO session) the tool errors before
+  collecting anything and returns the `aws sso login --profile <name>` command to fix it. No
+  account is skipped, so a multi-account review is never partial. Pass `profiles=[]` for
+  environment / assume-role credentials.
+
+### Removed
+- **`aws-firewall-review`: standalone CLI and n8n coupling.** The `scripts/query_security_groups.py`
+  CLI is replaced by the MCP server (shared logic now in `mcp_server/collector_core.py`). Dropped
+  all n8n-specific framing from the skill, references, and template (the `<<...>>` placeholder
+  syntax remains, as it still avoids `{{ }}` templating collisions). Default assume-role session
+  names use a `dlvn-` prefix.
+
 ## [0.6.0] — 2026-06-24
 
 ### Added
