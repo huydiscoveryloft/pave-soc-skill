@@ -1,0 +1,135 @@
+name: SkillSpector Scan
+
+# Scan the repo's agent skills for vulnerabilities and malicious patterns
+# using NVIDIA SkillSpector (https://github.com/NVIDIA/skillspector).
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write  # required to upload SARIF to code scanning
+
+jobs:
+  skillspector:
+    name: Scan skills
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install SkillSpector
+        run: pip install "git+https://github.com/NVIDIA/skillspector.git"
+
+      - name: Run SkillSpector scan (SARIF output)
+        # --no-llm: static-only analysis, no API key needed in CI.
+        # Don't fail the step here so we can always render the summary.
+        run: |
+          skillspector scan . \
+            --format sarif \
+            --output skillspector.sarif \
+            --no-llm || echo "skillspector exited non-zero (findings present)"
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skillspector-sarif
+          path: skillspector.sarif
+
+      - name: Render findings to job summary
+        if: always()
+        shell: python
+        run: |
+          import json, os, pathlib
+
+          sarif_path = pathlib.Path("skillspector.sarif")
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+
+          def w(line=""):
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write(line + "\n")
+
+          w("# SkillSpector Scan Results")
+          w()
+
+          if not sarif_path.exists():
+              w("No SARIF report was produced. The scan step may have failed.")
+              raise SystemExit(0)
+
+          data = json.loads(sarif_path.read_text(encoding="utf-8"))
+
+          # Map SARIF level -> display label
+          level_label = {
+              "error": "High/Critical",
+              "warning": "Medium",
+              "note": "Low",
+              "none": "Info",
+          }
+
+          rows = []
+          counts = {}
+          for run in data.get("runs", []):
+              # Build ruleId -> rule metadata for nicer names
+              rules = {}
+              for rule in run.get("tool", {}).get("driver", {}).get("rules", []):
+                  rules[rule.get("id")] = rule
+              for result in run.get("results", []):
+                  rule_id = result.get("ruleId", "")
+                  rule = rules.get(rule_id, {})
+                  name = rule.get("name") or rule_id or "(unknown)"
+                  level = result.get("level", "none")
+                  counts[level] = counts.get(level, 0) + 1
+                  msg = result.get("message", {}).get("text", "").replace("\n", " ").strip()
+                  loc = ""
+                  locs = result.get("locations", [])
+                  if locs:
+                      phys = locs[0].get("physicalLocation", {})
+                      uri = phys.get("artifactLocation", {}).get("uri", "")
+                      line = phys.get("region", {}).get("startLine", "")
+                      loc = f"{uri}:{line}" if line else uri
+                  rows.append((level, rule_id, name, loc, msg))
+
+          total = len(rows)
+          if total == 0:
+              w("✅ **No findings.** SkillSpector reported no issues.")
+              raise SystemExit(0)
+
+          # Severity overview
+          w(f"**{total} finding(s)** detected.")
+          w()
+          w("| Severity | Count |")
+          w("|----------|-------|")
+          for lvl in ("error", "warning", "note", "none"):
+              if counts.get(lvl):
+                  w(f"| {level_label.get(lvl, lvl)} | {counts[lvl]} |")
+          w()
+
+          # Detailed findings (sorted by severity)
+          order = {"error": 0, "warning": 1, "note": 2, "none": 3}
+          rows.sort(key=lambda r: order.get(r[0], 99))
+
+          w("| Severity | Rule | Name | Location | Finding |")
+          w("|----------|------|------|----------|---------|")
+          for level, rule_id, name, loc, msg in rows:
+              msg = (msg[:160] + "…") if len(msg) > 160 else msg
+              # Escape pipes so the table doesn't break
+              msg = msg.replace("|", "\\|")
+              name = name.replace("|", "\\|")
+              w(f"| {level_label.get(level, level)} | {rule_id} | {name} | `{loc}` | {msg} |")
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: skillspector.sarif
+        continue-on-error: true  # tolerate private repos without Advanced Security

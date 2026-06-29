@@ -51,6 +51,13 @@ Keep a Changelog; versions track `.claude-plugin/plugin.json`.
   (`timeline-format.md`, `readable-report.md`) now require a blank line between every entry (and
   between the readable report's two header lines). Without it, Markdown collapsed the timeline
   into one run-on paragraph.
+## [Unreleased]
+
+### Added
+- **CI: SkillSpector security scan.** New `.github/workflows/skillspector.yml` runs NVIDIA
+  SkillSpector against the repo on push, pull request, and manual dispatch. Static-only
+  (`--no-llm`) SARIF scan; findings render to the GitHub Actions job summary, upload as an
+  artifact, and publish to code scanning.
 
 ## [0.5.1] — 2026-06-24
 
