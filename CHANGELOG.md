@@ -7,6 +7,14 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [Unreleased]
+
+### Added
+- **CI: SkillSpector security scan.** New `.github/workflows/skillspector.yml` runs NVIDIA
+  SkillSpector against the repo on push, pull request, and manual dispatch. Static-only
+  (`--no-llm`) SARIF scan; findings render to the GitHub Actions job summary, upload as an
+  artifact, and publish to code scanning.
+
 ## [0.5.1] — 2026-06-24
 
 ### Docs
