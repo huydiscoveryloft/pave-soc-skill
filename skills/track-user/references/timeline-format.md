@@ -31,8 +31,9 @@ from the UTC `eventTime` to UTC+7 (ICT).
 - One- or two-sentence plain-language characterization of what the user did this window.
 
 ## Timeline
-Each event on its own line, oldest first. Group by calendar day (UTC+7) with a `### YYYY-MM-DD`
-heading. Per entry:
+Each event on its own line, oldest first, **with one blank line between every entry** (Markdown
+collapses adjacent non-blank lines into one paragraph). Group by calendar day (UTC+7) with a
+`### YYYY-MM-DD` heading. Per entry:
 
 `HH:MM:SS` — **<eventName>** (`<eventSource>`) · acct `<recipientAccountId>` · `<awsRegion>` · from `<sourceIPAddress>` — <short plain description of what changed, incl. resource id(s) parsed from @message> [flags]
 
@@ -42,8 +43,11 @@ Flags (append only when they apply):
 - `❌ error: <errorCode>` — the call failed or was denied
 
 ### 2026-06-16
+
 08:41:12 — **ConsoleLogin** (`signin.amazonaws.com`) · acct 088420203827 · us-east-1 · from 203.0.113.4 — successful SSO console sign-in (MFA enforced at IdC) 🔐 sign-in
+
 09:02:55 — **AuthorizeSecurityGroupIngress** (`ec2.amazonaws.com`) · acct 088420203827 · ap-southeast-1 · from 203.0.113.4 — opened tcp/22 to 0.0.0.0/0 on sg-0d16ade6006de6c1c ⚠️ sensitive
+
 ...
 
 ## Notes & caveats
