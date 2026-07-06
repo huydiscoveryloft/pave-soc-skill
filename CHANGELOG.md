@@ -7,6 +7,49 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [0.9.0] — 2026-07-06
+
+### Added
+- **`webapp-pentest`: sandbox reachability preflight + local-runner fallback.** The Leading agent
+  now preflights the target from the sandbox (`curl` for an HTTP status) in Step 1, and each Exploit
+  agent re-checks before attacking. If the target is blocked by the egress allowlist (local/LAN
+  hosts, un-allowlisted `*.trycloudflare.com` tunnels), the Exploit agent no longer fails — it emits
+  a stdlib-only **local runner** into the workspace folder that the user runs on their host, writing
+  results back for Claude to read. Verdict in that case is **Inconclusive (pending local run)**.
+  Documents that allowlist changes only take effect in a **new session** and that tunnel URLs are
+  ephemeral. Verified live against a DVWA tunnel once allowlisted.
+- **`webapp-pentest`: authenticated-context support for login-gated targets.** New optional **auth**
+  input (login URL, user-supplied credentials, session mechanism, anti-CSRF field, any level/mode to
+  set). The Leading agent collects it (Step 1.3), the Threat-hunting agent configures an
+  **authenticated ZAP context** (login method, logged-in/out indicators, active user, logout
+  excluded) so the spider/active scan cover post-login pages, and each Exploit agent **logs in
+  first** — scraping any anti-CSRF token, detecting and setting required app state (e.g. DVWA
+  `security` level) rather than hard-coding it — before attacking authenticated endpoints. Verified
+  end-to-end against DVWA's authenticated SQLi module (UNION-based extraction of DB version + a
+  targeted credential row, non-destructive).
+
+## [0.8.0] — 2026-07-01
+
+### Added
+- **New skill: `webapp-pentest`.** Runs an authorized web-application penetration test as a
+  four-role **agent team** and returns a consolidated report. A **Leading agent** (the orchestrator
+  context) scopes the target with the user and builds an **OWASP Top 10 (2025)** checklist; a
+  **Threat-hunting agent** subagent drives the **ZAP MCP** (`mcp__zap__*`: context → spider → AJAX
+  spider → passive-queue drain → active scan → report) and exports normalized findings; a
+  **Report-review agent** subagent triages findings into an exploit-target list, each item carrying
+  full context plus a checkable `success_criteria`; and **one Exploit agent subagent per target**
+  writes and runs non-destructive Python PoCs (sandboxed shell) until the criterion is met or
+  approaches are exhausted. Report-review then writes the final report. Roles run as real subagents
+  (mirrors `alert-triage`); the orchestrator owns the parse/aggregate/fan-out glue. Invoked
+  `/webapp-pentest <target-url>`. OWASP 2025 category list verified against owasp.org.
+- **`webapp-pentest`: mandatory authorization gate.** No spider/scan/exploit runs until the user
+  confirms in-scope target(s) and explicit authorization (Step 1.2). Once confirmed, scanning and
+  in-scope PoC execution are **auto-approved** (no per-step confirmation) but bounded to
+  **non-destructive**, in-scope actions — no data destruction/exfiltration, persistence, DoS, or
+  out-of-scope pivoting. Files (report, ZAP export, PoC scripts) are written to the workspace only;
+  no external publish step.
+- **New required connector: ZAP** (`mcp__zap__*`) for `webapp-pentest`.
+
 ## [0.7.0] — 2026-06-26
 
 ### Added

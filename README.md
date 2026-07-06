@@ -23,6 +23,14 @@ new sub-skills (e.g. `triage`) drop in under `skills/` without touching existing
     `/track-user huy.nguyen 14`, or `/track-user huy.nguyen 2026-06-01 2026-06-22`. Window
     defaults to the **last 7 days**. Claude can also invoke it when you ask to track/audit what a
     specific person did in AWS.
+- **webapp-pentest** — Runs an authorized web-app penetration test as a four-role agent team:
+  a **Leading agent** scopes the target and builds an OWASP Top 10 (2025) checklist, a
+  **Threat-hunting agent** drives the ZAP MCP (spider → passive → active scan), a
+  **Report-review agent** triages findings into exploit targets (each with a success criterion),
+  and one **Exploit agent** per target writes/runs non-destructive Python PoCs — then a
+  consolidated report is written to the workspace. Requires explicit authorization before scanning.
+  - Invoke with **`/webapp-pentest <target-url>`** (e.g. `/webapp-pentest https://staging.example.com`).
+    Claude can also invoke it when you ask to pentest or ZAP-scan a web target.
 
 ## Required connectors (MCP)
 - **OpenSearch** — query Wazuh alert indices (daily-security-report, alert-triage)
@@ -31,6 +39,7 @@ new sub-skills (e.g. `triage`) drop in under `skills/` without touching existing
 - **Atlassian Rovo** — read operation notes + create Confluence pages (daily-security-report,
   alert-triage)
 - **Slack** — post the daily-report summary (daily-security-report only)
+- **ZAP** (`mcp__zap__*`) — spider/passive/active scanning + report generation (webapp-pentest)
 
 Analysis and CVE web-search are handled natively by Claude; no LLM/search MCP is required.
 
@@ -47,10 +56,14 @@ pave-soc/
     │   ├── SKILL.md
     │   ├── references/   (alert-query, agent-chain, incident-report, publishing)
     │   └── template/     (incident-report-template.md — from the official PDF)
-    └── track-user/
+    ├── track-user/
+    │   ├── SKILL.md
+    │   ├── references/   (activity-query, timeline-format)
+    │   └── scripts/      (activity_window.py)
+    └── webapp-pentest/
         ├── SKILL.md
-        ├── references/   (activity-query, timeline-format)
-        └── scripts/      (activity_window.py)
+        ├── references/   (agent-team, owasp-checklist, zap-scanning, exploit-agent)
+        └── template/     (pentest-report-template.md)
 ```
 
 ## Adding a sub-skill later
