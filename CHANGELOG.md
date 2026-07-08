@@ -7,6 +7,68 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [0.12.0] — 2026-07-08
+
+### Added
+- **`webapp-pentest`: stage subcommands.** The engagement can now run **one stage at a time** as well
+  as end-to-end. `/webapp-pentest <url>` (no subcommand) still runs the whole pipeline; the new
+  `/webapp-pentest scope`, `/webapp-pentest recon`, and `/webapp-pentest exploit` each run a single
+  stage. Stages share a per-engagement state directory in the workspace folder
+  (`webapp-pentest-<slug>/`) — `scope` writes `engagement.json`; `recon` writes `sitemap.json`,
+  `targets.json`, `session.json`; `exploit` writes `exploit-results.json`, the PoC artifacts, and the
+  final report. A subcommand resolves the engagement from its `[url]` arg or the most recent
+  `engagement.json`, reads the prior stage's artifacts (stopping with a clear message if absent), and
+  re-checks the recorded authorization before touching the target. Raw credentials are never
+  persisted.
+
+### Changed
+- **`webapp-pentest`: four-role team → three-role team.** Removed the separate **Report-review**
+  agent. Its two jobs are redistributed: the **Recon agent** (renamed from *Threat-hunting*) now owns
+  **crawl + sitemap + target-marking** — it emits the exploit-target list (each item with a
+  `success_criteria` and `non_destructive_bound`) directly from the crawl, so the standalone triage
+  pass is gone; and the **Leading agent** now **writes the final report** itself. The pivot loop is
+  now **recon → exploit → pivot-review** (was crawl → triage → exploit → pivot-review); the
+  authorization gate, non-destructive rules, and 3-round cap are unchanged. Updated `SKILL.md`,
+  `references/agent-team.md`, `references/burp-recon.md`, `references/exploit-agent.md`,
+  `references/owasp-checklist.md`, the report template, and the README.
+
+## [0.11.0] — 2026-07-07
+
+### Changed
+- **`webapp-pentest`: replaced ZAP with Burp Suite + a real-browser crawl.** The discovery half of
+  the skill no longer uses an automated scanner. The Threat-hunting agent now **crawls the target in
+  a real browser (Claude in Chrome) routed through Burp**, then builds the sitemap/attack surface
+  from **Burp's proxy history** (`get_proxy_http_history`), and the Exploit agents craft and replay
+  HTTP requests through the **Burp MCP** (`send_http1_request`/`send_http2_request`, Intruder/Repeater
+  handoff, encode-decode helpers) instead of running Python PoCs in the sandbox. Benefits: the whole
+  pipeline runs on the user's **local** Burp + browser, so local/LAN/tunnel targets work with no
+  egress-allowlist/new-session dance and **no local-runner fallback**; login-gated targets are
+  handled by logging in through the real browser form (capturing the session in Burp history), which
+  **eliminates the ZAP re-auth/redirect loop**; and HTTP/2 testing is now native. Trade-off: no
+  automated passive/active scan — **vulnerability detection is agent-driven**, so a **proxy-wiring
+  preflight** (Chrome → Burp `127.0.0.1:8080` + trusted CA) is required or discovery finds nothing.
+  Replaced `references/zap-scanning.md` with `references/burp-recon.md`; rewrote `SKILL.md`,
+  `references/agent-team.md`, `references/exploit-agent.md`, `references/owasp-checklist.md`, and the
+  report template. Pivot loop and authorization gate unchanged. Updated README and plugin manifest
+  (ZAP → Burp Suite + Claude in Chrome).
+
+## [0.10.0] — 2026-07-07
+
+### Added
+- **`webapp-pentest`: iterative pivot loop.** The engagement is no longer a single linear pass —
+  when an Exploit agent confirms a vulnerability, it now reports a **`new_access`** list of resources
+  the exploit unlocked (new endpoints/paths, admin/API surface, escalated role/session, revealed
+  internal hosts, recovered credentials). A new **pivot-review** stage (Step 4.5, run by the Leading
+  agent) unions and **filters that access to the confirmed scope**, then loops back to the ZAP scan
+  on the newly reachable resources — threading any elevated session/credentials as updated auth
+  context — so the scan → triage → exploit cycle repeats and follows access deeper. The loop
+  terminates when a round surfaces **no new in-scope resources** or after a hard **iteration cap
+  (default 3 rounds)**. Out-of-scope resources discovered via an exploit are **logged and skipped**,
+  never followed — the loop widens coverage within scope, never the scope itself. The final report
+  now includes an **attack-path / pivot narrative** (which exploit unlocked what, round by round) and
+  notes any in-scope surface left untested when the cap was hit. Updated `SKILL.md`,
+  `references/agent-team.md`, `references/exploit-agent.md`, and `template/pentest-report-template.md`.
+
 ## [0.9.0] — 2026-07-06
 
 ### Added
