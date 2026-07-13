@@ -7,6 +7,19 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [0.14.0] — 2026-07-13
+
+### Added
+- **`daily-security-report`: dashboard status hooks.** New *Status reporting* section: the skill
+  now pushes each run's pipeline status and per-source security posture to the SOC dashboard's D1
+  database `dailyreport` via the Cloudflare MCP (best-effort — a failed emit never blocks the
+  report). One upserted row per report date carries `status` (running/done/halted/failed) and a
+  separate `severity` (info/low/medium/high/critical, reused from the Tier 3 findings table) plus
+  a per-source `sources_json` (`{name,severity,count,note}`). Backs the "Daily security health"
+  dashboard page (D1 `dailyreport`, id `1c97153d-d9ba-4c7c-ab27-73029e5684e1`). Ships
+  `references/cf-snippets.md` (exact `mcp__cloudFlare__execute` calls) and
+  `references/d1-schema.sql`.
+
 ## [0.13.0] — 2026-07-12
 
 ### Added
