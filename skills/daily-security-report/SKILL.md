@@ -124,6 +124,39 @@ Confluence parent `webUrl`, then post it to the channel in `references/publishin
 Tell the user: report_id, sources that ran, the Confluence parent link, and that the Slack
 message was posted.
 
+## Status reporting (dashboard)
+This skill **pushes** each run's status and per-source posture to the SOC dashboard's D1
+database `dailyreport` (Daily security health page), via the Cloudflare MCP
+(`mcp__cloudFlare__execute`). The dashboard only reads; it never triggers a run. Read
+`references/cf-snippets.md` for the exact calls (the D1 id and SQL live there); the table
+shape is in `references/d1-schema.sql`.
+
+**Principles.** One row per `report_date` (upsert — a re-run supersedes the day). Writes are
+**best-effort: a failed D1 emit must never abort or delay the report.** `status` is the
+pipeline state (`running`/`done`/`halted`/`failed`); `severity` is the security posture
+(`info`/`low`/`medium`/`high`/`critical`) — two independent signals. Emit on every run
+(scheduled and interactive); the dashboard is meant to reflect them all.
+
+**Emit points** (each maps to a workflow step above):
+1. **Start — after Step 1 (reporting period).** UPSERT the row with `status='running'`,
+   `phase='collecting'`, `report_id`, `triggered_by` (`'scheduled'` for an auto/scheduled
+   invocation, else the operator's email), and `created_at`/`started_at`/`updated_at=now`.
+2. **Boundaries — Steps 2/3/5.** UPDATE `phase` to `analyzing` (entering Step 2 analysis),
+   `fusing` (Step 3), then `publishing` (Step 5); bump `updated_at` each time.
+3. **Halt — Step 2 malfunction on a scheduled run.** UPDATE `status='halted'`, `phase='halted'`,
+   `error='<source> — <reason>'`, `finished_at=now`, and write the partial `sources_json`
+   collected so far (so the dashboard shows which source was red and why). Do this **in
+   addition to** the existing maintainer Slack DM — it does not replace it.
+4. **Success — after Steps 5–6.** UPDATE `status='done'`, `phase='done'`, `confluence_url=`
+   the Confluence parent `webUrl`, `summary=` a one-line takeaway, `finished_at=now`, and the
+   security posture: build `sources_json` as an array of
+   `{name, severity, count, note}` — one element per source, mapping each source's **Tier 3
+   findings-table severity + disposition** (Step 3) into `severity` (`info|low|medium|high|
+   critical`) and a one-line `note` — then set the row `severity` to the **max** across sources.
+5. **Failure — unexpected error.** UPDATE `status='failed'`, `error=<message>`, `finished_at=now`.
+
+Severity is **reused from the Tier 3 findings table** — do not invent a second severity scale.
+
 ## Notes
 - Times in all output are UTC+7. OpenVPN/VD `timestamp`, Physical `data.timestamp`, and AWS
   CloudTrail `eventTime` are all stored/returned in UTC; the query windows use UTC+7 ISO
