@@ -23,14 +23,19 @@ new sub-skills (e.g. `triage`) drop in under `skills/` without touching existing
     `/track-user huy.nguyen 14`, or `/track-user huy.nguyen 2026-06-01 2026-06-22`. Window
     defaults to the **last 7 days**. Claude can also invoke it when you ask to track/audit what a
     specific person did in AWS.
-- **webapp-pentest** — Runs an authorized web-app penetration test as a four-role agent team:
-  a **Leading agent** scopes the target and builds an OWASP Top 10 (2025) checklist, a
-  **Threat-hunting agent** drives the ZAP MCP (spider → passive → active scan), a
-  **Report-review agent** triages findings into exploit targets (each with a success criterion),
-  and one **Exploit agent** per target writes/runs non-destructive Python PoCs — then a
-  consolidated report is written to the workspace. Requires explicit authorization before scanning.
-  - Invoke with **`/webapp-pentest <target-url>`** (e.g. `/webapp-pentest https://staging.example.com`).
-    Claude can also invoke it when you ask to pentest or ZAP-scan a web target.
+- **webapp-pentest** — Runs an authorized web-app penetration test as a three-role agent team:
+  a **Leading agent** scopes the target, builds an OWASP Top 10 (2025) checklist, and writes the
+  final report; a **Recon agent** crawls the app in a real browser (Claude in Chrome) through
+  **Burp**, maps the attack surface from proxy history, and **marks the exploitable targets** (each
+  with a success criterion); and one **Exploit agent** per target crafts non-destructive HTTP-request
+  PoCs via the **Burp MCP**. A confirmed exploit that unlocks new in-scope resources loops the
+  recon→exploit cycle (pivot loop, 3-round cap) before the consolidated report is written to the
+  workspace. Requires explicit authorization before testing.
+  - Invoke with **`/webapp-pentest <target-url>`** (e.g. `/webapp-pentest https://staging.example.com`)
+    to run the whole pipeline, or run one stage at a time with **`/webapp-pentest scope`**,
+    **`/webapp-pentest recon`**, or **`/webapp-pentest exploit`** — each stage persists its artifacts
+    to a per-engagement folder so the next stage can pick up. Claude can also invoke it when you ask
+    to pentest or Burp-scan a web target.
 
 ## Required connectors (MCP)
 - **OpenSearch** — query Wazuh alert indices (daily-security-report, alert-triage)
@@ -39,7 +44,8 @@ new sub-skills (e.g. `triage`) drop in under `skills/` without touching existing
 - **Atlassian Rovo** — read operation notes + create Confluence pages (daily-security-report,
   alert-triage)
 - **Slack** — post the daily-report summary (daily-security-report only)
-- **ZAP** (`mcp__zap__*`) — spider/passive/active scanning + report generation (webapp-pentest)
+- **Burp Suite** (`mcp__burp__*`) — proxy-history capture + crafted HTTP requests (webapp-pentest)
+- **Claude in Chrome** (`mcp__claude-in-chrome__*`) — real-browser crawl through Burp (webapp-pentest)
 
 Analysis and CVE web-search are handled natively by Claude; no LLM/search MCP is required.
 
@@ -62,7 +68,7 @@ pave-soc/
     │   └── scripts/      (activity_window.py)
     └── webapp-pentest/
         ├── SKILL.md
-        ├── references/   (agent-team, owasp-checklist, zap-scanning, exploit-agent)
+        ├── references/   (agent-team, owasp-checklist, burp-recon, exploit-agent)
         └── template/     (pentest-report-template.md)
 ```
 

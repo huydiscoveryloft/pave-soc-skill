@@ -1,9 +1,9 @@
 {
   "name": "pave-soc",
-  "version": "0.9.0",
-  "description": "PAVE/DLVN SOC automation. Bundles SOC skills (daily security reporting, alert triage, user activity tracking, AWS firewall/security-group review, web-app penetration testing, with more to come) backed by OpenSearch, AWS CloudWatch, a Dockerised AWS firewall-review MCP collector, ZAP, Atlassian, and Slack.",
+  "version": "0.12.0",
+  "description": "PAVE/DLVN SOC automation. Bundles SOC skills (daily security reporting, alert triage, user activity tracking, AWS firewall/security-group review, web-app penetration testing, with more to come) backed by OpenSearch, AWS CloudWatch, a Dockerised AWS firewall-review MCP collector, Burp Suite, Claude in Chrome, Atlassian, and Slack.",
   "author": {
     "name": "DLVN Security Engineering"
   },
-  "keywords": ["soc", "security", "wazuh", "opensearch", "cloudtrail", "aws", "soc2", "pentest", "owasp", "zap"]
+  "keywords": ["soc", "security", "wazuh", "opensearch", "cloudtrail", "aws", "soc2", "pentest", "owasp", "burp"]
 }
