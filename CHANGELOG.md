@@ -7,6 +7,26 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [0.13.0] — 2026-07-12
+
+### Added
+- **New skill `pentest-job-runner`.** A generic harness that drains the Cloudflare pentest job queue
+  and runs one `webapp-pentest` per tick: reconciles crashed runs, acquires a single-machine D1 lock,
+  pulls a job (via the Cloudflare MCP), drives `webapp-pentest`, uploads the report to R2, writes the
+  terminal status to D1, and acknowledges the message. Backs the self-service pentest dashboard
+  (D1 `pentest`, queue `pentest-jobs`, bucket `pentest-reports`). Ships `references/cf-snippets.md`
+  (exact `mcp__cloudFlare__execute` calls) and `references/d1-schema.sql`.
+- **`webapp-pentest`: dashboard status reporting.** New *Status reporting* section. In automated mode
+  (the invocation carries `job_id`/`d1`), the Leading agent emits a free-text `phase` at each step
+  boundary (`scoping`/`recon`/`exploit`/`pivot`/`reporting`) to D1 via the Cloudflare MCP, bumps the
+  runner-lock heartbeat, and returns the report path for R2 upload. Best-effort (never blocks the
+  pentest) and gated on a passed `job_id`; interactive runs are unchanged and emit nothing.
+
+### Fixed
+- **`webapp-pentest`: description length.** Trimmed the `SKILL.md` frontmatter `description` to stay
+  under the 1024-character plugin-validation limit (it had exceeded the limit since the 0.12.0
+  subcommand refactor, failing `.plugin` packaging). Trigger phrases and invocation forms preserved.
+
 ## [0.12.0] — 2026-07-08
 
 ### Added
