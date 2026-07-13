@@ -7,6 +7,23 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [0.15.0] — 2026-07-13
+
+### Added
+- **`aws-firewall-review`: dashboard status hooks + Confluence auto-publish.** New *Status
+  reporting* section: on a full quarterly review the skill now pushes one row per quarter to the
+  SOC dashboard's D1 database `fwreview` (id `78dde69f-cc9a-4b43-a265-03ae835fbc8c`) via the
+  Cloudflare MCP (best-effort — a failed emit never blocks the review). The row carries `status`
+  (running/done/failed), a separate `assessment` (EFFECTIVE/PARTIALLY EFFECTIVE/NOT EFFECTIVE
+  from the render rules), summed HIGH/MEDIUM/LOW + SG counts, and an `accounts_json` with each
+  account's counts, per-account assessment, Confluence link, and full `findings[]` (stable F-NNN
+  ids) — backing the dashboard's per-account cards and combined severity-sorted findings table.
+  The render step now also **auto-publishes** to Confluence (a quarter parent page + one child
+  page per account under the `AWS Firewall Review Report` folder, id `312508532`, in the
+  `pavewiki` space) and records each child's `webUrl`; publish failure is non-fatal. Backs the
+  "Firewall review" dashboard page. Ships `references/cf-snippets.md` (exact
+  `mcp__cloudFlare__execute` calls) and `references/d1-schema.sql`.
+
 ## [0.14.0] — 2026-07-13
 
 ### Added
