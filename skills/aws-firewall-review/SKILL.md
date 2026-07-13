@@ -101,12 +101,60 @@ Additional Observations → Sign-Off → Appendix A (SCP-denied regions) → App
 `references/example_report.md` is a complete worked example (the Q2 2026 report)
 — consult it if you need to see the expected tone, depth, and table formatting.
 
+## Status reporting (dashboard)
+
+A full quarterly review (Collect **and** Render) backs the SOC dashboard's **Firewall
+review** page. On such a run the skill pushes one row per **quarter** into the D1 database
+`fwreview` (id `78dde69f-cc9a-4b43-a265-03ae835fbc8c`) via the Cloudflare MCP
+(`mcp__cloudFlare__execute`). The dashboard only reads; the skill is the sole writer.
+
+- **When to report.** Only for an end-to-end review (Collect → Render → publish). A
+  render-only or collect-only ad-hoc run does **not** push unless the user asks. Decide once
+  at the start.
+- **Best-effort.** Every emit is wrapped so a failure is logged and ignored — a failed push
+  must never abort or alter the review.
+- **Keying.** One row per `quarter` (`YYYYQn`, from `metadata.generated_at`), upserted, so a
+  re-run supersedes that quarter. `status` (running/done/failed) is the pipeline state;
+  `assessment` (the render-rules rating) is the security posture — two independent signals.
+- **`triggered_by`** = `"scheduled"` for an unattended run, else the operator's email.
+
+The exact `mcp__cloudFlare__execute` calls are in `references/cf-snippets.md`; the table
+shape is in `references/d1-schema.sql`. Emit points:
+1. **Collect start** — upsert `status='running'`, `phase='collecting'`, `review_id`,
+   `triggered_by` (cf-snippets §1).
+2. **Phase boundaries** — `phase` → `analyzing` → `rendering` → `publishing`, bumping the
+   heartbeat (§2).
+3. **Success** — after all accounts are rendered and published: `status='done'`,
+   `assessment` (worst across accounts), `total_high/medium/low`, `total_sgs`, `unused_sgs`,
+   and `accounts_json` — one element per account with its counts, per-account `assessment`,
+   `confluence_url`, and the **full `findings[]`** (each `{finding_id, severity, group_id,
+   region, category, detail}`, reusing the report's stable `F-NNN` ids). The dashboard
+   flattens these into one severity-sorted "All findings" table (§3).
+4. **Failure** — the collector is all-or-nothing: if any profile fails to authenticate, or an
+   unexpected error occurs, write `status='failed'` with `error` naming the profile and the
+   exact `aws sso login --profile <name>` command (§4).
+
 ## Confluence notes
 
-- To publish to Confluence, the rendered markdown can be pasted into a page or
-  pushed via the REST API. If the user maintains the template *in* Confluence,
-  they should keep the `<<...>>` placeholder syntax so it isn't intercepted by a
-  templating engine.
+The review **auto-publishes** to Confluence so the dashboard's per-account "View report"
+links resolve. For each end-to-end run:
+
+- Publish into the **`pavewiki` space** (space id `20480022`, cloudId
+  `0ab6bc10-825b-445d-a6db-6e3c267094dc`), under the existing **`AWS Firewall Review Report`
+  folder** (id `312508532`,
+  `https://paveai.atlassian.net/wiki/spaces/pavewiki/folder/312508532`). Create a **parent
+  page** for the quarter (e.g. `AWS Firewall Review — <QUARTER>`) with `parentId` = the folder
+  id `312508532`, then **one child page per account** (`parentId` = that quarter page) whose
+  body is the account's rendered `DLVN-SEC-REV-<NNN>` markdown. Use the Atlassian MCP
+  `createConfluencePage`.
+- Capture each child page's `webUrl` and put it in that account's `confluence_url` in the
+  Success emit (§3 above). The parent page's `webUrl` can go in `summary` or be linked from
+  the children.
+- **Publish failure is non-fatal.** If a page can't be created, leave that account's
+  `confluence_url` null (the dashboard card shows "report not published") and continue — the
+  review still completes and reports `done`.
+- Keep the `<<...>>` placeholder syntax out of published pages (it's a render-time marker); if
+  the user maintains the *template* in Confluence, the placeholders stay only in the template.
 
 ## Important constraints
 
