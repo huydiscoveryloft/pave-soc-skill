@@ -7,6 +7,14 @@ per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *w
 change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
 Keep a Changelog; versions track `.claude-plugin/plugin.json`.
 
+## [Unreleased]
+
+### Changed
+- **Docs: rewrote `README.md` for readability.** Restructured into a quick-start plus a
+  scannable skills table, documented the two previously-missing skills (`aws-firewall-review`,
+  `pentest-job-runner`), consolidated required connectors into a table, and refreshed the
+  project layout. No behavior change.
+
 ## [0.15.0] — 2026-07-13
 
 ### Added
