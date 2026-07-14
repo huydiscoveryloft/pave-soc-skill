@@ -2,10 +2,9 @@
 
 All notable changes to the `pave-soc` plugin and its skills.
 
-This is the **single source of truth** for change history across the plugin and all skills; the
-per-asset `MAINTAINERS.md` files no longer keep their own changelogs. For the *why* behind each
-change, read the corresponding `MAINTAINERS.md` (intent and decisions). Format loosely follows
-Keep a Changelog; versions track `.claude-plugin/plugin.json`.
+This is the **single source of truth** for change history across the plugin and all skills. Each
+entry should capture both what changed and the *why* behind it. Format loosely follows Keep a
+Changelog; versions track `.claude-plugin/plugin.json`.
 
 ## [Unreleased]
 
@@ -14,6 +13,9 @@ Keep a Changelog; versions track `.claude-plugin/plugin.json`.
   scannable skills table, documented the two previously-missing skills (`aws-firewall-review`,
   `pentest-job-runner`), consolidated required connectors into a table, and refreshed the
   project layout. No behavior change.
+- **Docs: dropped stale `MAINTAINERS.md` references.** The `MAINTAINERS.md` files no longer
+  exist; removed the pointers to them from `README.md` and the `CHANGELOG.md` preamble. The
+  `CHANGELOG.md` is now the single place for both what changed and why. No behavior change.
 
 ## [0.15.0] — 2026-07-13
 

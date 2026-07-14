@@ -112,4 +112,4 @@ pave-soc/
 Add a skill by creating `skills/<name>/SKILL.md` (plus optional `references/` and `scripts/`). It's auto-discovered as `pave-soc:<name>` and invokable as `/<name>` — no wiring needed.
 
 > [!NOTE]
-> Before changing a skill, read its `MAINTAINERS.md` for intent and past decisions, and add an entry to the top-level `CHANGELOG.md` on every change.
+> Before changing a skill, add an entry to the top-level `CHANGELOG.md` on every change — capturing both what changed and the *why* behind it.
