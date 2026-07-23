@@ -1,25 +1,25 @@
 ---
 name: iam-access-request
-description: Turn an AWS access request from Slack or Jira into a reviewed, least-privilege IAM suggestion on the SOC dashboard, then generate its setup guide once approved. Invoke with /iam-access-request followed by a Slack permalink or Jira key (e.g. /iam-access-request PDO-286), or a subcommand — "/iam-access-request discovery" plus a request id to resolve placeholder ARNs against the real AWS estate, "/iam-access-request challenge" plus a request id or the path to a downloaded challenge briefing to answer questions about a request (can this role reach production, what is the blast radius if its credentials leak, is there an escalation path), and "/iam-access-request guide" plus a request id to write the setup guide for an approved request. Use this WHENEVER someone asks for AWS access, permissions, an IAM role, an IAM user, a policy, or "access to" an AWS resource — even if they do not say IAM — and whenever the user asks to draft, review, challenge, or assess the blast radius of an IAM policy. Drafts the identity plus a least-privilege policy, records its assumptions, emits a portable challenge briefing, and uploads the request to the dashboard where configured reviewers approve it unanimously.
+description: Turn an AWS access request from Slack or Jira into a reviewed, least-privilege IAM suggestion on the SOC dashboard, then generate its setup guide once approved. Invoke with /iam-access-request plus a Slack permalink or Jira key (e.g. /iam-access-request PDO-286), or a subcommand: "discovery" plus a request id resolves placeholder ARNs against the real AWS estate; "challenge" plus a request id or a downloaded record file loads the reasoning behind a drafted policy so a security engineer can push back on it from experience, and answers what the record does and does not justify; "guide" plus a request id writes the setup guide for an approved request. Use this WHENEVER someone asks for AWS access, permissions, an IAM role, an IAM user, a policy, or "access to" an AWS resource — even if they do not say IAM — and whenever the user asks to draft, review, or challenge an IAM policy.
 ---
 
 # IAM Access Request
 
 Turns "please give me access to X" into an auditable, least-privilege change: a drafted
-identity + policy, an explicit list of what was assumed, evidence from the real AWS estate, a
-briefing a reviewer can interrogate, unanimous human approval, and only then a setup guide.
+identity + policy, an explicit list of what was assumed, evidence from the real AWS estate,
+a record of why it is shaped that way, unanimous human approval, and only then a setup guide.
 
 ```
 Slack message / Jira ticket
    │  /iam-access-request <link|KEY>
    ▼
-draft: identity + policy + assumptions + challenge briefing   (placeholders allowed)
+draft: identity + policy + assumptions + challenge record   (placeholders allowed)
    │  INSERT into D1 `iamreq` via the Cloudflare MCP
    ▼
 Dashboard ▸ Cloud Security ▸ IAM access request
    │  /iam-access-request discovery <id>   ← resolve <PLACEHOLDER> ARNs, re-upload
-   │  reviewer downloads the challenge briefing and interrogates it, anywhere:
-   │    /iam-access-request challenge <file>  ← "can this reach production?"
+   │  a security engineer downloads the challenge record and pushes back on it:
+   │    /iam-access-request challenge <file>  ← their experience vs the reasoning
    │  reviewers approve or reject in the dashboard (unanimous; one reject closes it)
    ▼  status = approved
 /iam-access-request guide <id>  → policy JSON + aws cli written to guide_md
@@ -81,7 +81,7 @@ connector. Do not "be careful instead".
 |---|---|
 | `/iam-access-request <slack-link\|JIRA-KEY>` | Read the source, draft the request, upload it |
 | `/iam-access-request discovery <id>` | Resolve `<PLACEHOLDER>` identifiers against real AWS, regenerate the policy, update the row |
-| `/iam-access-request challenge <id\|file>` | Answer questions about a request from its briefing. Read-only |
+| `/iam-access-request challenge <id\|file>` | Hold the design reasoning while a human challenges it. Terse answers, read-only |
 | `/iam-access-request guide <id>` | **Only if `status = approved`** — write the setup guide onto the row |
 
 If the user just says "someone needs access to X" with no link, draft from what they tell you —
@@ -139,6 +139,60 @@ request did *not* say.
 6. **Deliberate exclusions are part of the deliverable.** Note in `assumptions_md` what a
    careless draft would have included and you left out. That is what a reviewer checks fastest.
 
+### Check AWS's own guidance before finalising the policy
+
+**Whenever the tooling is available, verify the policy against AWS documentation rather than
+memory.** If an AWS skill or documentation connector is connected — an `aws-iam` skill, an AWS
+documentation MCP, `retrieve_skill` — use it. This is the difference between a policy that applies
+cleanly and one that fails at `aws iam put-role-policy`.
+
+Two checks earn their keep every time:
+
+1. **Action names must exist.** An invented or misremembered action (`athena:GetQueryResult` for
+   `athena:GetQueryResults`) is silent until someone applies the policy.
+2. **Whether an action supports resource-level permissions**, from the **Service Authorization
+   Reference**. Its *Resource types* column is authoritative: **if the column is empty, the action
+   does not support resource-level permissions and the statement must use `"*"`.** Never claim
+   `"*"` is unavoidable without checking, and never scope an ARN onto an action that cannot take
+   one — that statement silently fails.
+
+Also worth consulting: **IAM Access Analyzer** policy validation and generation, and the AWS
+managed policy reference before hand-rolling an equivalent.
+
+**Record what you checked** in the challenge record, and **say so if the tooling was
+unavailable** — a reviewer reads "verified against the Service Authorization Reference" very
+differently from "believed correct".
+
+### Find comparable published setups
+
+**Someone has usually wired this before, and written it up.** A reviewer wants those write-ups:
+*"here is how other teams did Grafana → CUR → Athena; compare ours."* Search for them at draft
+time and store them in `reference_links_json`.
+
+Search for the **actual stack**, not the abstraction — `grafana athena cost and usage report IAM
+policy`, not `aws iam best practices`. Prefer vendor documentation, engineering blogs, AWS's own
+blogs and `aws-samples` repositories, and real Terraform or CloudFormation.
+
+**Open every link before you store it.** Two things disqualify a result that looked perfect in the
+search listing:
+
+- **It does not resolve**, or redirects somewhere else. A dead link in a security review is worse
+  than no link.
+- **It contains no IAM detail.** Plenty of "how to set up X" posts never show a policy. If it does
+  not help a reviewer judge permissions, leave it out.
+
+For each link that survives, store `title`, `url`, and a **`note` saying what it shows and how it
+differs from this draft** — that comparison is the whole value:
+
+> *AWS's own walkthrough. Uses `AmazonS3ReadOnlyAccess` rather than a scoped policy, and requires
+> the Athena workgroup to carry a `GrafanaDataSource: true` tag — worth checking against ours.*
+
+**Two to five good links, not ten mediocre ones.** If nothing survives verification, store `[]`
+and say in the challenge record that you looked and found nothing comparable. That is an honest
+and useful result; a fabricated or unchecked URL is neither.
+
+**Never invent a URL.** If you cannot fetch a page to confirm it, do not store it.
+
 ### Placeholders — never guess an identifier
 
 Any account id, bucket ARN, workgroup ARN, role ARN, VPC or subnet you cannot confirm goes in
@@ -147,22 +201,35 @@ as a literal `<PLACEHOLDER_NAME>` — e.g. `<CUR_BUCKET_ARN>` — and is listed 
 gap:** the gap gets fixed, the wrong ARN gets applied. Resolve them with `discovery`, not with
 inference.
 
-### The challenge briefing
+### The challenge record
 
-Write `challenge_prompt_md` as a **portable context bundle**, not a request for a verdict. A
-reviewer downloads it from the dashboard and hands it to whatever LLM they trust, which must then
-be able to answer questions about the request — *can this role reach production?*, *if the
-credential leaks, what is the blast radius?*, *is there an escalation path out of here?*
+Write `challenge_prompt_md` as a **design record**, answering one question as fully as you can:
+**why is this policy drafted the way it is?**
 
-That means it carries the original ask, the drafted identity and both policies, the assumptions,
-the discovery evidence, the unresolved placeholders, the deliberate exclusions — **and the slice
-of estate context those questions need**: which account this lives in, what else runs there, and
-what trusts what. A briefing without that cannot answer a blast-radius question at all, which is
-what made the first version unusable.
+A security engineer downloads it, loads it into whatever LLM they use, and challenges it against
+their own experience of running IAM. The human brings the challenge; this document brings the
+reasoning. It is **not** a request for a verdict and **not** a checklist for a model to work
+through.
 
-See `references/challenge-prompt.md` for the required shape. Tell the reader, in the opening line,
-to use a *different* model than the one that drafted the policy — a model reviewing its own output
-agrees with itself.
+**The rule: every design decision appears with the reason it was made and the alternative that
+was rejected.** Why this identity rather than extending an existing one, why this account, why
+each permission traces back to something the requester actually said they need, how each ARN was
+narrowed, where `Resource: "*"` was forced by an API with no resource-level support, what a
+careless draft would have included, and what you assumed.
+
+**Where the real reason is thin, say so.** "This prefix is taken verbatim from the ticket and was
+never verified" is worth more to a challenger than a confident-sounding rationalisation. A
+decision stated without its *because* is the first thing an experienced engineer will attack, and
+there will be nothing to answer with.
+
+Include the slice of estate context that questions about reach and blast radius need: which
+account this lives in, what else runs there, what trusts what.
+
+Close it with **how the policy was checked** (which AWS documentation, and what it confirmed — or
+that the tooling was unavailable) and the **comparable setups** you found, so a reviewer has real
+examples to weigh it against.
+
+See `references/challenge-prompt.md` for the required shape.
 
 ### Upload
 
@@ -213,49 +280,67 @@ Discovery does **not** change `status`, `reviewer_snapshot`, or any review rows.
 
 ## 3. Challenge — `/iam-access-request challenge <id|file>`
 
-Answer questions about a request. **Read-only, always** — this subcommand writes nothing: not D1,
-not AWS, not a review. It exists so a reviewer can interrogate a proposal before approving it.
+Hold the reasoning behind a request while a human challenges it. **Read-only** — this writes
+nothing: not D1, not AWS, not a review.
 
-Two ways in, and both must work:
+Two ways in:
 
-- **`challenge <request-id>`** — read the row from D1 (snippet 3 in `references/cf-snippets.md`,
-  which returns `challenge_prompt_md`) and work from that.
-- **`challenge <path-to-file>`** — the briefing downloaded from the dashboard. **This is the
-  important one.** The point of a portable briefing is that a reviewer can run it in a session
-  with no access to this estate, no Cloudflare MCP and no AWS — including a different model than
-  the one that drafted the policy. If you are handed a file, work only from it and say so when it
-  does not contain enough to answer.
+- **`challenge <request-id>`** — read the row from D1 (snippet 3 in `references/cf-snippets.md`).
+- **`challenge <path-to-file>`** — the record downloaded from the dashboard. **This is the
+  important one.** It lets a security engineer run the session anywhere, in any model, with no
+  access to this estate.
 
-### How to answer
+### Answer length — short by default
 
-Open with a two-line orientation — what identity, in which account, at what status — then take
-questions. Typical ones, and what a good answer looks like:
+**A closed question gets a one-word answer.** No preamble, no restating the question, no summary
+paragraph afterwards.
 
-- **"Can this reach production?"** Trace it: what the policy allows, what the trust policy lets
-  assume it, whether any resource ARN or wildcard crosses an account boundary. Name the path, or
-  say plainly that nothing in the briefing grants it.
-- **"What is the blast radius if the credentials leak?"** Enumerate concretely — which resources,
-  read or write, in which account — and separate what the identity can do *directly* from what it
-  can reach by assuming something else.
-- **"Is there an escalation path?"** Look for `iam:PassRole`, policy-attachment actions, `sts`
-  permissions, and write access to anything that runs code with a role attached.
-- **"Is this least privilege?"** Compare the granted actions against the stated need, and name
-  specific statements rather than judging the policy as a whole.
+```
+Q: Can I use this profile to connect to KMS to decrypt a secret?
+A: No
 
-**Ground every answer in the briefing.** If the answer depends on something not written there — a
-resource policy, an SCP, what a bucket actually contains — say which fact is missing rather than
-assuming the reassuring case. `<PLACEHOLDER>` values mean the real scope is still unknown, and any
-answer about them is provisional; say that too.
+Q: Can I use this to access the production database?
+A: No
+```
 
-**Do not soften the finding to be agreeable.** A reviewer running this is trying to find the
-problem, and a challenge session that agrees with everything is worth nothing.
+**Expand in exactly three cases:**
 
-### After the questions
+1. **The answer is Yes.** A yes means the permission is actually there, and the engineer needs the
+   specifics: which statement grants it, and how far it reaches. Keep it to a few lines.
+2. **They ask.** "Why?", "explain", "show me the statement" — then give the reasoning in full.
+3. **The record cannot answer it.** Say so in one line and name the missing fact:
+   `Not in the record — the trust policy principal is still <PLACEHOLDER>.`
+   **Never answer "No" because the record is silent.** Absence of a granted permission is a No;
+   absence of *information* is not, and collapsing the two is how a session gives false comfort.
 
-Offer to summarise what the session surfaced, in a form the reviewer can paste into the
-dashboard's **Challenge findings** field on their review. Do not paste it for them and do not
-submit the review — approval is theirs, made in the dashboard where the Access JWT identifies
-them.
+Open questions ("what is the blast radius?") still get a tight answer — a list, not an essay.
+
+### Your role in the session
+
+**The engineer challenges; you account for the design.** They bring years of running IAM systems
+and will push on things the draft treats as settled. Your job is to explain what the record says
+and to be straight about what it does not.
+
+- **Answer from the record.** If it explains why a permission is there, give that reason. If it
+  does not, say the record does not justify it — never reconstruct a plausible-sounding
+  rationale to fill the gap.
+- **Concede when they are right.** An engineer saying "that trust policy burned us in production"
+  is evidence the draft lacks. The correct response is to agree it is a finding and note what
+  would change, **not** to defend the draft. You are not its advocate.
+- **Do not soften to be agreeable either.** If the record genuinely justifies a choice, say so and
+  show the reasoning. A session that folds on every challenge is as useless as one that folds on
+  none.
+- **Separate what is known from what is assumed.** Placeholders mean the real scope is still
+  unknown; any answer about them is provisional and must say so.
+- **Reach and blast radius questions** are answered from the estate context in the record. If it
+  is not there, that is the answer — say which fact is missing rather than guessing the
+  reassuring case.
+
+### After the session
+
+Offer to summarise what the engineer surfaced — the findings, not your defence of them — in a form
+they can paste into the dashboard's **Challenge findings** field. Do not submit the review:
+approval is theirs, made in the dashboard where the Access JWT identifies them.
 
 ---
 
@@ -296,7 +381,7 @@ guide into chat — link the dashboard and summarise.
 
 Requests appear at **Cloud Security ▸ IAM access request** on
 `https://dashboard.aisoc.center/cloud-security/iam-access-request`. Reviewers approve or reject
-there; the page shows the policy, assumptions, discovery evidence, challenge briefing, per-
+there; the page shows the policy, assumptions, discovery evidence, challenge record, per-
 reviewer status, and the guide download once generated.
 
 ## References
@@ -306,4 +391,4 @@ reviewer status, and the guide download once generated.
 | `references/system-facts.md` | Estate facts that change what a draft should say: accounts, what runs where, the placement rule. **Read before drafting.** Facts only — no status, no dates. |
 | `references/cf-snippets.md` | Exact Cloudflare MCP calls for insert / discovery update / guide write |
 | `references/d1-schema.sql` | The `iamreq` schema this skill writes (mirror of the dashboard's migration `0012`) |
-| `references/challenge-prompt.md` | Required shape of the portable challenge briefing |
+| `references/challenge-prompt.md` | Required shape of the challenge record: why the policy is drafted this way |

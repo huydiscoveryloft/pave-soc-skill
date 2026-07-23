@@ -1,47 +1,55 @@
 # The challenge prompt
 
-`challenge_prompt_md` is a **portable context bundle**. A reviewer downloads it from the dashboard
-and hands it to whatever LLM they trust, which then has to answer questions about the request:
+`challenge_prompt_md` is a **design record**. It answers one question in as much depth as it can:
 
-> *Can this role reach production?*
-> *If the access key leaks, what is the blast radius?*
-> *Could the holder escalate from here?*
-> *What could it read that nobody asked for?*
+> **Why is this policy drafted the way it is?**
 
-**It is a briefing, not a verdict request.** The earlier version asked for an opinion in one shot;
-this one hands over enough context that a reviewer can interrogate the design. That difference
-drives everything below.
+A security engineer downloads it, loads it into whatever LLM they use, and then challenges it —
+against their own experience of running IAM systems. *"We got burned by exactly that trust policy
+in 2023."* *"Nobody scopes Glue that way in practice; here is what breaks."* *"That statement is
+fine, but you have missed the one that will page us at 3am."*
 
-## Three properties it must have
+**The human brings the challenge. The document brings the reasoning.** The model is only the
+vehicle the engineer loads the context into so the back-and-forth is informed.
 
-**1. Self-contained.** The reading model sees this text and nothing else — no repo, no ticket, no
-AWS access, no conversation. Anything it needs to reason with has to be inline.
+## What this is not
 
-**2. Enough estate context to answer a blast-radius question.** This is what the old prompt
-lacked. "Can this reach production?" is unanswerable without knowing which account the identity
-lives in, what else lives there, and what trusts what. Include the relevant slice of
-`system-facts.md` — not the whole file, the parts that bear on *this* request.
+- **Not a request for a verdict.** It does not ask the model to approve, score, or judge. The
+  engineer does that.
+- **Not a checklist for an agent to work through.** An earlier version ended with five questions
+  aimed at the model, which made it a review task rather than a briefing.
+- **Not a summary.** A summary drops the reasoning, and the reasoning is the whole payload. If a
+  decision is stated without its "because", the engineer has nothing to push against.
 
-**3. Neutral.** Do not tell the model the policy is least-privilege. That is the question, not the
-premise. State what was drafted and why; let the reader disagree.
+## The rule that makes it work
+
+**Every design decision appears with the reason it was made and the alternative that was
+rejected.** A statement in the policy with no recorded "why" is exactly what an experienced
+engineer will attack first — and the model will have nothing to say.
+
+If the real reason was thin — a guess, a default, a ticket comment taken at face value — **say
+that**. "This prefix is taken verbatim from the ticket and was never verified" is far more useful
+to a challenger than a confident-sounding rationalisation.
 
 ## Required shape
 
 ```markdown
-# Challenge briefing — <title>
+# Why this IAM change is drafted this way — <title>
 
-You are being handed a proposed AWS IAM change to examine. Everything you need is in this
-document; you have no access to the AWS account and should not assume any fact that is not
-written here. Answer the reader's questions directly, and say plainly when the document does not
-contain enough to answer.
+This document records the reasoning behind a proposed AWS IAM change: what was asked for, what is
+being granted, and why each decision was made. It exists so a security engineer can challenge that
+reasoning from experience. It is not a verdict, and nothing here should be treated as settled.
 
-## The request
-<the original ask in the requester's own words, translated to English if needed>
-Source: <Jira key or Slack thread>. Requester: <name>.
+Answer the reader's challenges from what is written here. Where the record does not justify a
+decision, say so plainly rather than inventing a justification. Where the reader's experience
+contradicts the reasoning, that is a finding — record it, do not defend the draft.
 
-## What is proposed
+## What was asked for
+<the original request in the requester's own words, translated if needed, plus the source>
+<how it was interpreted, and anything in the ask that was ambiguous>
+
+## What is being granted
 Identity: <name> (<role|user>) in the <profile> account (<account id>).
-<one sentence on why this identity rather than extending an existing one>
 
 ### Permission policy
 ```json
@@ -50,49 +58,63 @@ Identity: <name> (<role|user>) in the <profile> account (<account id>).
 
 ### Trust policy
 ```json
-<the full trust policy — omit this section entirely for an IAM user>
+<the full trust policy — omit for an IAM user>
 ```
 
+## Why it is shaped this way
+
+### Why this identity
+<role vs user; new identity vs extending an existing one; which existing identity was considered
+and why it did or did not fit; why this account>
+
+### Why each permission is here
+<statement by statement, or grouped: what the requester needs to do that requires it, traced back
+to the ask. A reader must be able to see the line from "they said they need X" to "hence this
+action".>
+
+### Why the resource scoping is what it is
+<how each ARN was narrowed. Every `Resource: "*"` named explicitly, with why it was unavoidable —
+usually the API has no resource-level support. If it is "*" for convenience, say that instead.>
+
+### What was deliberately left out
+<permissions a careless draft would have included, and the reason each was excluded>
+
+### What was assumed
+<every assumption, what it rests on, and what would change in the policy if it turned out wrong>
+
 ## Where this lives
-<the relevant slice of the estate: which account, what else runs in it, which accounts it can and
-cannot reach, and any cross-account trust that bears on this request. Enough that a blast-radius
-question is answerable.>
+<the account, what else runs in it, which accounts it can and cannot reach, any cross-account
+trust that bears on this request. Enough that a question about reach or blast radius can be
+answered.>
 
-## Assumptions made while drafting
-<every assumption, including ones the operator resolved and what they resolved to>
+## What is not yet known
+<each placeholder, what it stands for, and what discovery would resolve it — or "none">
+<anything the record is genuinely weak on, stated as such>
 
-## Evidence from the AWS estate
-<what was actually looked up, in which account, and what came back — or "discovery has not been
-run; every identifier below is a placeholder">
+## How this was checked
+<which AWS documentation was consulted and what it confirmed — action names, whether an action
+supports resource-level permissions. If the tooling was unavailable, say so plainly.>
 
-## Still unresolved
-<each placeholder and what it stands for — or "none">
+## Comparable setups found
+<the write-ups stored in reference_links_json, each with what it shows and how it differs from
+this draft — or "searched and found nothing comparable">
 
-## Deliberately excluded
-<permissions a careless draft would have included, and why they were left out>
-
-## What the reader may ask
-Anything about this request. Common starting points:
-- Can this identity reach any environment other than the one named above? By what path?
-- If its credentials leaked, what exactly could the holder do, read, or change?
-- Is there a privilege-escalation path out of these permissions?
-- Is any permission broader than the request requires? Name the statement.
-- Is anything missing that the request genuinely needs?
-- Is the trust relationship correct and appropriately narrow?
-- Would you approve this as written? If not, what would you change?
 ```
 
 ## Notes
 
-- **Include the deliberate exclusions.** They are the fastest thing to check, and they show the
-  draft considered the over-grant rather than missing it.
-- **Be honest about placeholders.** A briefing whose policy is full of `<PLACEHOLDER>` values is
-  still worth challenging for shape and scope, but it has to say that is what it is.
-- **Answer in a different model than the one that drafted the policy** — a model reviewing its own
-  output agrees with itself. Say so in the opening line, since the reviewer chooses where to paste
-  it.
-- **Length is not the constraint, completeness is** — but every paragraph should be one the reader
-  would miss if it were gone. The 11.7 KB first version was long without being interrogable, which
-  is the failure this shape is meant to fix.
-- The reviewer can also run it through this skill directly: `/iam-access-request challenge` with
-  the downloaded file, or with the request id.
+- **Weak reasoning must look weak.** Do not upgrade "the ticket said so" into "per the documented
+  requirement". The engineer is trying to find the soft spots; hiding them wastes the session.
+- **Include the estate context.** Questions about reach and blast radius are common and cannot be
+  answered without knowing which account this sits in and what it can talk to.
+- **Placeholders are fine, silence is not.** A record whose ARNs are still `<PLACEHOLDER>` is
+  worth challenging on shape and scope, but it has to say that is what it is.
+- **Comparable setups are for comparison, not authority.** Another team's policy is evidence of
+  what is normal, not proof of what is correct — plenty of published walkthroughs attach
+  `AmazonS3ReadOnlyAccess` where a scoped policy belongs. The `note` on each link should say how
+  it differs from this draft, which is exactly what a reviewer wants to argue with.
+- **Every link was opened before it was stored.** A search result that looks perfect can contain
+  no IAM detail at all, and URLs move — Google Cloud's documentation, for instance, now lives on
+  `docs.cloud.google.com`. A dead or irrelevant link in a security review is worse than none.
+- **Length is not the constraint, completeness of reasoning is** — but every paragraph should be
+  one whose absence would leave a decision unexplained.

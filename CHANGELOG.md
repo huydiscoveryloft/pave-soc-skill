@@ -8,6 +8,91 @@ Changelog; versions track `.claude-plugin/plugin.json`.
 
 ## [Unreleased]
 
+## [0.24.1] — 2026-07-23
+
+### Fixed
+- **`iam-access-request`: the insert snippet had no column for the links it was told to store.**
+  0.24.0 added the "find comparable published setups" step and pointed it at
+  `reference_links_json`, but `references/cf-snippets.md` still carried the pre-`0014` `INSERT` —
+  16 columns, no place for the links. The skill would have had to improvise the one statement that
+  must not be improvised. Added the column and its param, plus a standalone `UPDATE` snippet for
+  adding links to an existing request, and `reference_links_json` to the single-request read used
+  by discovery and challenge sessions. Column, placeholder and param arity re-checked: 17 columns,
+  16 placeholders plus the literal `'pending'`.
+
+## [0.24.0] — 2026-07-23
+
+### Added
+- **`iam-access-request`: the draft now checks AWS's own guidance before finalising a policy.**
+  Whenever an AWS skill or documentation connector is available, verify against it rather than
+  memory. Two checks earn their keep every time: **action names must exist** (an invented
+  `athena:GetQueryResult` is silent until someone applies the policy), and **whether an action
+  supports resource-level permissions**, from the Service Authorization Reference — its *Resource
+  types* column is authoritative, and an empty column means the statement must use `"*"`. Never
+  claim `"*"` is unavoidable without checking; never scope an ARN onto an action that cannot take
+  one, which fails silently. What was checked goes in the challenge record, and so does "the
+  tooling was unavailable" — a reviewer reads those very differently.
+- **`iam-access-request`: comparable published setups are found per request** and stored in
+  `reference_links_json` (webapp migration `0014`), so a reviewer can compare the draft against
+  how other teams wired the same thing.
+  - Search the **actual stack**, not the abstraction: *grafana athena cost and usage report IAM
+    policy*, not *aws iam best practices*.
+  - **Every link is opened before it is stored.** Two disqualifiers, both of which came up while
+    testing the idea: it does not resolve, or it contains no IAM detail at all. AWS's own Managed
+    Grafana blog passed and turned out to carry a real gotcha (Athena workgroups need a
+    `GrafanaDataSource: true` tag); the observability best-practices page looked just as relevant
+    in the search listing and had no policy in it.
+  - Each link stores a **note saying how it differs from this draft** — that comparison is the
+    value. Another team's policy is evidence of what is normal, not proof of what is correct.
+  - Two to five verified links, not ten mediocre ones. Nothing found is an honest result and is
+    recorded as such; **a fabricated or unchecked URL is neither.**
+
+## [0.23.1] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: challenge answers are terse by default.** Sessions were returning
+  paragraphs where the honest answer was one word.
+  - **A closed question gets a one-word answer.** No preamble, no restating the question, no
+    trailing summary. *"Can I use this profile to decrypt a secret with KMS?" — "No."*
+  - Expand in exactly three cases: **the answer is Yes** (the permission is really there, so the
+    engineer needs which statement grants it and how far it reaches), **they ask** for the
+    reasoning, or **the record cannot answer** — one line naming the missing fact.
+  - **Never answer "No" because the record is silent.** Absence of a granted permission is a No;
+    absence of *information* is not. Collapsing the two is how a challenge session gives false
+    comfort, which is the opposite of its purpose.
+
+## [0.23.0] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: the challenge artifact is a design record, not a review request.**
+  0.22.0 got the reframe half right. It made the prompt a briefing *for another agent to examine*,
+  ending in questions aimed at the model. That is still a review task, just a longer one.
+  - What it actually is: **the answer to "why is this policy drafted the way it is?"** A security
+    engineer downloads it, loads it into their own LLM, and challenges the reasoning **against
+    their experience of running IAM systems** — *"that trust policy burned us in 2023"*. The human
+    brings the challenge; the document brings the reasoning; the model is the vehicle.
+  - `references/challenge-prompt.md` is rewritten around one rule: **every design decision appears
+    with the reason it was made and the alternative that was rejected.** A decision stated without
+    its *because* is the first thing an experienced engineer attacks, and the session has nothing
+    to answer with. Where the real reason is thin — a ticket comment taken at face value — it must
+    say so rather than dress it up.
+  - The `challenge` subcommand's role changed accordingly: it **accounts for the design, it does
+    not judge it**. Answer from the record; say plainly when the record does not justify a
+    decision instead of reconstructing a plausible rationale; and **concede when the engineer is
+    right** — their experience is evidence the draft lacks, and the agent is not the draft's
+    advocate. Equally, do not fold on a choice the record genuinely justifies.
+  - Dashboard copy follows: *Challenge record*, "Why this policy is drafted the way it is.
+    Download it, load it into your own LLM, and challenge the reasoning against your experience."
+
+## [0.22.1] — 2026-07-23
+
+### Fixed
+- **`iam-access-request`: plugin validation rejected the description for length.** Adding the
+  `challenge` subcommand pushed it to 1206 characters against a 1024 limit, so the whole plugin
+  failed to install. Rewritten at 921. Every skill description is now checked against the limit
+  before packaging, alongside the existing XML-tag check — the two install failures so far have
+  both been frontmatter constraints, not content problems.
+
 ## [0.22.0] — 2026-07-23
 
 ### Changed

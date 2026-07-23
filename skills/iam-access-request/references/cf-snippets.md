@@ -48,14 +48,19 @@ async () => {
     policy: { Version: "2012-10-17", Statement: [ /* ... */ ] },
     notes: "<free text>",
   };
+  // Comparable published setups, each already opened and confirmed to contain IAM detail.
+  // note = what it shows and how it differs from this draft. [] is a valid, honest answer.
+  const referenceLinks = [
+    // { title: "<TITLE>", url: "https://…", note: "<what it shows, how it differs>" },
+  ];
   const reviewers = ["<lowercased emails from step 0>"];
   return cloudflare.request({ method:"POST", path, body:{
     sql:`INSERT INTO iam_requests
            (id, created_at, updated_at, requester, source_type, source_ref, title,
             identity_type, suggestion_json, setup_steps_md, assumptions_md,
             discovery_evidence_md, placeholders_json, challenge_prompt_md,
-            reviewer_snapshot, status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`,
+            reference_links_json, reviewer_snapshot, status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`,
     params:[
       "<UUID>", now, now,
       "<REQUESTER>",                    // who asked, as named in the source
@@ -66,6 +71,7 @@ async () => {
       "<SETUP_STEPS_MD>", "<ASSUMPTIONS_MD>", "<DISCOVERY_EVIDENCE_MD>",
       JSON.stringify(["<PLACEHOLDER_NAME>"]),   // [] when nothing is unresolved
       "<CHALLENGE_PROMPT_MD>",
+      JSON.stringify(referenceLinks),   // [] when nothing survived verification
       JSON.stringify(reviewers),
     ] }});
 }
@@ -96,6 +102,19 @@ async () => {
 }
 ```
 
+To add or replace links on an existing request without touching anything else:
+
+```js
+async () => {
+  const now = Math.floor(Date.now()/1000);
+  const D1 = "0d85d6ea-fcc9-445e-8a8e-85c55a43401d";
+  const path = `/accounts/${accountId}/d1/database/${D1}/query`;
+  return cloudflare.request({ method:"POST", path, body:{
+    sql:"UPDATE iam_requests SET reference_links_json=?, updated_at=? WHERE id=?",
+    params:[ JSON.stringify([/* verified links */]), now, "<UUID>" ] }});
+}
+```
+
 ## 3. Read one request — before discovery, a challenge session, or writing a guide
 
 ```js
@@ -105,7 +124,7 @@ async () => {
   const res = await cloudflare.request({ method:"POST", path, body:{
     sql:`SELECT id, title, status, identity_type, suggestion_json, placeholders_json,
                 assumptions_md, discovery_evidence_md, reviewer_snapshot,
-                challenge_prompt_md,
+                challenge_prompt_md, reference_links_json,
                 guide_md IS NOT NULL AS has_guide
          FROM iam_requests WHERE id=?`,
     params:["<UUID>"] }});
