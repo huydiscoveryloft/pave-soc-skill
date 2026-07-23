@@ -8,6 +8,360 @@ Changelog; versions track `.claude-plugin/plugin.json`.
 
 ## [Unreleased]
 
+## [0.24.1] — 2026-07-23
+
+### Fixed
+- **`iam-access-request`: the insert snippet had no column for the links it was told to store.**
+  0.24.0 added the "find comparable published setups" step and pointed it at
+  `reference_links_json`, but `references/cf-snippets.md` still carried the pre-`0014` `INSERT` —
+  16 columns, no place for the links. The skill would have had to improvise the one statement that
+  must not be improvised. Added the column and its param, plus a standalone `UPDATE` snippet for
+  adding links to an existing request, and `reference_links_json` to the single-request read used
+  by discovery and challenge sessions. Column, placeholder and param arity re-checked: 17 columns,
+  16 placeholders plus the literal `'pending'`.
+
+## [0.24.0] — 2026-07-23
+
+### Added
+- **`iam-access-request`: the draft now checks AWS's own guidance before finalising a policy.**
+  Whenever an AWS skill or documentation connector is available, verify against it rather than
+  memory. Two checks earn their keep every time: **action names must exist** (an invented
+  `athena:GetQueryResult` is silent until someone applies the policy), and **whether an action
+  supports resource-level permissions**, from the Service Authorization Reference — its *Resource
+  types* column is authoritative, and an empty column means the statement must use `"*"`. Never
+  claim `"*"` is unavoidable without checking; never scope an ARN onto an action that cannot take
+  one, which fails silently. What was checked goes in the challenge record, and so does "the
+  tooling was unavailable" — a reviewer reads those very differently.
+- **`iam-access-request`: comparable published setups are found per request** and stored in
+  `reference_links_json` (webapp migration `0014`), so a reviewer can compare the draft against
+  how other teams wired the same thing.
+  - Search the **actual stack**, not the abstraction: *grafana athena cost and usage report IAM
+    policy*, not *aws iam best practices*.
+  - **Every link is opened before it is stored.** Two disqualifiers, both of which came up while
+    testing the idea: it does not resolve, or it contains no IAM detail at all. AWS's own Managed
+    Grafana blog passed and turned out to carry a real gotcha (Athena workgroups need a
+    `GrafanaDataSource: true` tag); the observability best-practices page looked just as relevant
+    in the search listing and had no policy in it.
+  - Each link stores a **note saying how it differs from this draft** — that comparison is the
+    value. Another team's policy is evidence of what is normal, not proof of what is correct.
+  - Two to five verified links, not ten mediocre ones. Nothing found is an honest result and is
+    recorded as such; **a fabricated or unchecked URL is neither.**
+
+## [0.23.1] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: challenge answers are terse by default.** Sessions were returning
+  paragraphs where the honest answer was one word.
+  - **A closed question gets a one-word answer.** No preamble, no restating the question, no
+    trailing summary. *"Can I use this profile to decrypt a secret with KMS?" — "No."*
+  - Expand in exactly three cases: **the answer is Yes** (the permission is really there, so the
+    engineer needs which statement grants it and how far it reaches), **they ask** for the
+    reasoning, or **the record cannot answer** — one line naming the missing fact.
+  - **Never answer "No" because the record is silent.** Absence of a granted permission is a No;
+    absence of *information* is not. Collapsing the two is how a challenge session gives false
+    comfort, which is the opposite of its purpose.
+
+## [0.23.0] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: the challenge artifact is a design record, not a review request.**
+  0.22.0 got the reframe half right. It made the prompt a briefing *for another agent to examine*,
+  ending in questions aimed at the model. That is still a review task, just a longer one.
+  - What it actually is: **the answer to "why is this policy drafted the way it is?"** A security
+    engineer downloads it, loads it into their own LLM, and challenges the reasoning **against
+    their experience of running IAM systems** — *"that trust policy burned us in 2023"*. The human
+    brings the challenge; the document brings the reasoning; the model is the vehicle.
+  - `references/challenge-prompt.md` is rewritten around one rule: **every design decision appears
+    with the reason it was made and the alternative that was rejected.** A decision stated without
+    its *because* is the first thing an experienced engineer attacks, and the session has nothing
+    to answer with. Where the real reason is thin — a ticket comment taken at face value — it must
+    say so rather than dress it up.
+  - The `challenge` subcommand's role changed accordingly: it **accounts for the design, it does
+    not judge it**. Answer from the record; say plainly when the record does not justify a
+    decision instead of reconstructing a plausible rationale; and **concede when the engineer is
+    right** — their experience is evidence the draft lacks, and the agent is not the draft's
+    advocate. Equally, do not fold on a choice the record genuinely justifies.
+  - Dashboard copy follows: *Challenge record*, "Why this policy is drafted the way it is.
+    Download it, load it into your own LLM, and challenge the reasoning against your experience."
+
+## [0.22.1] — 2026-07-23
+
+### Fixed
+- **`iam-access-request`: plugin validation rejected the description for length.** Adding the
+  `challenge` subcommand pushed it to 1206 characters against a 1024 limit, so the whole plugin
+  failed to install. Rewritten at 921. Every skill description is now checked against the limit
+  before packaging, alongside the existing XML-tag check — the two install failures so far have
+  both been frontmatter constraints, not content problems.
+
+## [0.22.0] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: the cross-check prompt becomes a challenge briefing.** The operator test
+  found it was the wrong artifact — written as a one-shot *"review this and return a verdict"*
+  request, and at 11.7 KB nobody reads it that way.
+  - It is now a **portable context bundle** a reviewer downloads and interrogates: *can this role
+    reach production?*, *if the credential leaks, what is the blast radius?*, *is there an
+    escalation path?* A briefing, not a verdict request.
+  - **That changes what it must contain.** A verdict request needs the policy and the ask; an
+    interrogable briefing also needs the relevant slice of **estate context** — which account the
+    identity lives in, what else runs there, what trusts what — or a blast-radius question cannot
+    be answered at all. `references/challenge-prompt.md` (replaces `crosscheck-prompt.md`)
+    specifies the shape.
+  - Column names follow the vocabulary: `challenge_prompt_md` and `challenge_findings`
+    (webapp migration `0013`). Leaving the old names would make every future reader translate
+    between two vocabularies.
+
+### Added
+- **`/iam-access-request challenge <id|file>`** — a fourth subcommand that answers questions about
+  a request. Read-only: it writes nothing, approves nothing, and touches no AWS.
+  - **Takes a downloaded file as well as a request id**, and the file form is the point: a
+    reviewer can run the briefing in a session with no access to this estate, no Cloudflare MCP
+    and no AWS, in a different model than the one that drafted the policy.
+  - Told to ground every answer in the briefing, to name the missing fact rather than assume the
+    reassuring case, to treat any answer about a `<PLACEHOLDER>` as provisional, and **not to
+    soften findings to be agreeable** — a challenge session that agrees with everything is worth
+    nothing.
+  - Offers to summarise what the session surfaced for pasting into the dashboard's *Challenge
+    findings* field, but never submits the review: approval is the human's, made where the Access
+    JWT identifies them.
+
+## [0.21.0] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: `references/` now contains only what a skill run reads.** The discovery
+  identity's CloudFormation template and setup procedure were shipping as skill references, but
+  they are one-time operator artifacts deployed by a human, never read during a run — they
+  appeared in the references table and nowhere else in the procedure, which is what gave it away.
+  Moved out of the plugin to the project's `infra/` directory.
+  - Remaining references, each cited inline by the step that uses it: `system-facts.md` (estate
+    facts, before drafting), `cf-snippets.md` (the Cloudflare MCP calls, at write time),
+    `crosscheck-prompt.md` (prompt shape, at draft time), `d1-schema.sql` (the write contract —
+    lets a failed INSERT be self-corrected against the CHECK constraints without a round trip,
+    and matches the sibling D1-writing skills).
+  - Corrected a pointer in `system-facts.md` that named a file no longer shipped with the skill.
+
+## [0.20.0] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: reference files are now split by audience and lifetime**, not by topic.
+  `references/deployment.md` had become a mix of durable estate facts, operator procedure and
+  dated status, which made every part of it harder to trust.
+  - **`references/system-facts.md`** (new, replaces `deployment.md`) holds **only** facts that
+    change what a draft should say: account ids, what runs where, the placement rule, regions,
+    CloudTrail location. It states its own inclusion rule at the top — *a fact belongs here only
+    if not knowing it would make a draft wrong, and only if it will still be true in six months
+    without anyone editing it.*
+  - **Status moved out.** The `ProwlerScanRole` unverified-permissions warning and the note that
+    the AWS MCP proxy has no read-only mode are current state, not facts, and now live in a dated
+    *Current state* section of `references/discovery-setup.md`. The read-only rationale moved
+    there too, as *Why read-only*.
+  - Why it matters: a stale estate note produces confidently wrong drafts, which is the exact
+    failure this skill exists to prevent. Mixing durable facts with dated status is how notes go
+    stale.
+  - The pattern is recorded in the Obsidian component note (`Architecture Description/IAM Access
+    Request`) so future work on this skill follows it: for any new reference file, ask who reads
+    it and how long it stays true.
+
+## [0.19.1] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: split the deployment note by audience.** It had grown to serve two
+  readers at once — the skill, which reads it before every draft, and an operator standing up the
+  discovery identity. The setup procedure now lives in `references/discovery-setup.md`, written
+  for an experienced engineer: commands first, and only the non-obvious constraints spelled out
+  (management deploys first because a trust policy resolves its principal ARN at save time;
+  `ExternalId` only if the connector can send one; the access key out of band; keys before stacks
+  on teardown).
+- **`references/deployment.md` trimmed 146 → 84 lines**, keeping what shapes a draft (accounts,
+  what runs where, the placement rule and its two-identity corollary) and reducing the read-only
+  discussion to the rule, the pointer, and the `ProwlerScanRole` warning.
+  - **Fixed a contradiction**: the header still said `management` was unconfirmed while the table
+    listed `088420203827`.
+
+## [0.19.0] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: the two discovery templates are now one.**
+  `discovery-hub-user.yaml` and `discovery-role.yaml` are replaced by
+  `references/discovery-setup.yaml`, deployed once per account. `CreateHubUser=true` (management
+  only) creates the hub user **and** the role, wiring the role's trust policy to the user with
+  `!GetAtt` — CloudFormation infers the dependency and orders the two itself, so no ARN is copied
+  by hand and the deploy-order trap fixed in 0.18.1 cannot recur. The other three accounts deploy
+  the same file with `CreateHubUser=false` and the ARN as a parameter.
+  - **Why one file rather than two:** two templates each defining the same role is two things to
+    keep in step. One definition cannot drift from itself.
+  - **Why the other accounts still need a parameter:** a stack acts on a single account and
+    region, `!GetAtt` cannot cross that boundary, and cross-stack `Export`s are account and
+    region scoped as well. Documented **StackSets** as the way to automate the fan-out without
+    changing the template.
+  - **No dependency cycle:** the role's trust policy references the user with `!GetAtt`, while the
+    user's policy builds the role ARNs with `!Sub` from account ids. Using `!GetAtt` in both
+    directions would deadlock the stack, and three of the four roles are in other accounts
+    anyway.
+  - Guardrails, the optional `ExternalId`, and the refusal to create an access key in
+    CloudFormation are unchanged.
+
+## [0.18.1] — 2026-07-23
+
+### Fixed
+- **`iam-access-request`: the documented deploy order was backwards and would have failed.** Both
+  `discovery-hub-user.yaml` and `references/deployment.md` said to deploy the target roles before
+  the hub user. IAM resolves a trust policy's `Principal` ARN to that principal's unique id when
+  the policy is saved, so a role naming a user that does not exist yet fails with
+  `MalformedPolicyDocument: Invalid principal in policy`. Corrected to **hub user first, then the
+  roles**, with the failure named so the next reader understands why the order is not arbitrary.
+  The reverse dependency is harmless: the user's identity policy may reference role ARNs that do
+  not exist yet.
+
+## [0.18.0] — 2026-07-23
+
+### Added
+- **`iam-access-request`: `references/discovery-hub-user.yaml`** — the management-account half of
+  the discovery pair, matching the operator's chosen design: one IAM user in `management` whose
+  access keys configure the AWS MCP connector, assuming a read-only role in each target account.
+  - **The user holds no permissions of its own.** `sts:AssumeRole` on exactly four role ARNs
+    (one per account, listed explicitly so a same-named role in an unrelated account is not
+    reachable) plus `sts:GetCallerIdentity`, and an explicit `Deny` with `NotAction` on
+    everything else. A leaked key therefore grants read-only discovery and nothing more, and
+    stays that way even if `AdministratorAccess` is attached to the user later.
+  - **The template deliberately does not create the access key.** `AWS::IAM::AccessKey` writes
+    the secret into the stack's outputs and state, readable by anyone with
+    `cloudformation:DescribeStacks`. The key is created out of band and pasted straight into the
+    connector.
+
+### Fixed
+- **`discovery-role.yaml`: a mandatory `ExternalId` could have bricked discovery.** The trust
+  policy required `sts:ExternalId` unconditionally, but the AWS MCP connector may have no way to
+  send one — in which case every `AssumeRole` fails and discovery is dead on arrival. It is now
+  optional: an empty value omits the condition entirely, via a CloudFormation `Condition` and
+  `AWS::NoValue`. A `StringEquals` against `""` would have been unsatisfiable and would have
+  locked the role permanently.
+
+### Changed
+- **`references/deployment.md`** documents both halves, the deploy order (roles, then hub user,
+  then the key by hand), and why the key never goes in CloudFormation.
+
+## [0.17.1] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: recorded the estate placement rule.** Roles that a management tool or
+  shared service runs as (Grafana, Prowler, Prometheus, Wazuh, Pritunl, OpenVPN) live in the
+  **`management`** account, never in an environment account. A draft that would put a tooling
+  identity in `development` / `uat` / `production` is in the wrong account and must say so in
+  `assumptions_md`.
+  - Documented the corollary, which is where drafts usually go wrong: reaching *into* an
+    environment account is **two** identities, not one — the tool's own identity in `management`
+    plus a per-account role in the target account trusting it. So `ProwlerScanRole` sitting in
+    `development` is the target side of that pair, not a violation. What must never sit in an
+    environment account is the tool's own identity or long-lived keys for it.
+- **`management` account id recorded**: `088420203827`. No `<PLACEHOLDER>` account ids remain in
+  `references/deployment.md`.
+- **`discovery-role.yaml` now enforces the rule.** `TrustedPrincipalArn` carries an
+  `AllowedPattern` pinning it to `088420203827`, so CloudFormation rejects a principal outside
+  `management` at deploy time rather than leaving it to reviewer attention. The role the stack
+  creates is the target side of the pair and still deploys per account.
+
+## [0.17.0] — 2026-07-23
+
+### Added
+- **`iam-access-request`: `references/discovery-role.yaml`** — a CloudFormation template for
+  `SOCDiscoveryReadOnlyRole`, the read-only role the discovery connector should assume. Deploy
+  once per account. Drafted, not applied; applying it is a human action, per the skill's own
+  rules.
+  - Grants **`ViewOnlyAccess` + `SecurityAudit`** (verified against the AWS managed-policy
+    reference: "view resources and basic metadata" and "read security configuration metadata").
+    Both are maintained by AWS as new services launch, so the role does not rot.
+  - **Deliberately not `ReadOnlyAccess`**, which permits data-plane reads such as `s3:GetObject`.
+    Discovery needs resource *names and ARNs*, never resource *contents*.
+  - **Explicit `Deny` on IAM writes** by verb wildcard rather than a list of API names, so a
+    newly launched IAM action cannot fall outside the guardrail. Covers all eight known direct
+    privilege-escalation actions plus `iam:PassRole`, which combined with a create call on a
+    compute service escalates to any passable role in the account.
+  - **Explicit `Deny` on secret and data reads.** Discovery evidence is uploaded to the SOC
+    dashboard and rendered on a request page, so anything the agent can read can end up stored
+    and displayed to reviewers.
+  - **Explicit `Deny` on `sts:AssumeRole`**, making the role a leaf that cannot chain into a more
+    privileged one. An explicit `Deny` beats any inherited `Allow`, so the guardrail survives
+    someone later attaching a broad policy to this role.
+  - Trust policy is parameterised and requires an `ExternalId` (confused-deputy protection);
+    `MaxSessionDuration` is 1 hour. A `VerifyCommand` output prints the read-only
+    `simulate-principal-policy` check to run after deploying.
+
+### Changed
+- **`iam-access-request`: real account ids recorded** in `references/deployment.md` —
+  `development` `824155916596` (confirmed from a live `sts get-caller-identity`), `uat`
+  `477088859175` and `production` `379495554125` (operator-supplied). `management` remains
+  `<PLACEHOLDER>`.
+- **Flagged that discovery currently runs as `ProwlerScanRole`** in `development`, whose
+  permissions are unverified. It belongs to the withdrawn Prowler scan pipeline, so its
+  permissions will drift for reasons unrelated to this skill. Note says to verify with
+  `simulate-principal-policy` before pointing discovery at `uat` or `production`.
+
+## [0.16.2] — 2026-07-23
+
+### Security
+- **`iam-access-request`: hardened against the agent performing an actual IAM write.** The
+  0.16.0 skill relied on three lines of prose ("you never grant"), which is guidance, not a
+  control. Added a prominent **Hard limits** section up front:
+  - An explicit **deny list of AWS write APIs** (`iam:Create*`, `Put*`, `Attach*`, `Update*`,
+    `Delete*`, `Detach*`, `Add*`, `Remove*`, `Tag*`, `CreateAccessKey`,
+    `UpdateAssumeRolePolicy`, `CreatePolicy*`, plus write families on other services and
+    `sts:AssumeRole` into a more privileged role) — the prohibition is on the **effect**, by any
+    route: MCP, Bash, a script, or a snippet handed to the user to paste.
+  - **Never run the `aws` CLI from Bash, in any environment.** The old text leaned on "the
+    sandbox has no AWS egress", which is true of the Cowork sandbox and **false on an operator's
+    laptop**, where a live SSO session puts `aws iam create-role` one command away. An
+    environment's egress limits are not a safeguard the skill may depend on.
+  - **Never execute the setup guide.** The `guide` subcommand has the agent author the exact
+    `aws iam create-role …` commands that perform the grant, so "shall I run these?" is the most
+    likely path to an accidental write. Writing them is the deliverable; running them is the
+    thing the skill exists to prevent.
+  - **Confirm `READ_OPERATIONS_ONLY=true` before discovery, or stop** — the skill cannot set
+    that connector flag itself, so it must refuse rather than proceed write-capable. Discovery
+    is further restricted to `describe-*` / `list-*` / `get-*` / `lookup-*`.
+  - Stated plainly that **the skill enforces nothing** — a `SKILL.md` gives instructions, not
+    permissions — so nobody mistakes it for the guarantee.
+- **`references/deployment.md`: documented the control that does enforce it.** Discovery must
+  run under a read-only role (`ReadOnlyAccess` / `SecurityAudit`) or a profile carrying an
+  explicit `Deny` on the IAM write actions, since an explicit `Deny` beats an inherited admin
+  `Allow`. Also records why a **permission boundary on the drafted role does not help**: it
+  bounds what the new identity can do, not what the agent can do while drafting it.
+
+## [0.16.1] — 2026-07-23
+
+### Fixed
+- **`iam-access-request`: plugin validation rejected the skill description.** It used
+  `<id>` as a placeholder for a request id, and the validator reads anything in angle brackets
+  as an XML tag (`SKILL.md description cannot contain XML tags`), so the whole plugin failed to
+  install. Rewritten as prose. Angle brackets in the skill *body* and its reference files
+  (`<PLACEHOLDER_NAME>`, `<UUID>`) are unaffected — the rule applies only to frontmatter
+  descriptions. The other six skills were checked and none used the pattern.
+
+## [0.16.0] — 2026-07-23
+
+### Added
+- **New skill `iam-access-request`.** Turns an AWS access request from Slack or Jira into a
+  reviewed, least-privilege IAM suggestion on the SOC dashboard: draft → read-only discovery →
+  unanimous human approval → setup guide. Three subcommands (draft, `discovery`, `guide`),
+  writing `iam_requests` in the new D1 `iamreq` via the Cloudflare MCP.
+  - **The skill drafts and evidences; it never grants.** It writes no AWS state at any point —
+    discovery is read-only through the awslabs `aws-api-mcp-server` with
+    `READ_OPERATIONS_ONLY=true`, and the guide is a document a human applies.
+  - **It also never approves.** No write to `iam_reviews` or `status`; approval is a human act
+    in the dashboard, where the reviewer's identity comes from the Access JWT. A skill-written
+    review would defeat the control the feature exists to provide.
+  - **Unresolved identifiers stay `<PLACEHOLDER>` and are never guessed** — a plausible-looking
+    wrong ARN in an IAM policy is worse than an obvious gap, because the gap gets fixed and the
+    wrong ARN gets applied. `discovery` resolves them against the real estate and is re-runnable.
+  - **The cross-check prompt is self-contained and answered elsewhere.** It embeds the request,
+    policy, assumptions and evidence inline so an external model needs no other context, and it
+    asks to be run in a *different* model than the one that drafted the policy — a model
+    reviewing its own output agrees with itself. The verdict is pasted back by the reviewer;
+    the platform deliberately holds no model credentials.
+  - Org topology lives in `references/deployment.md` bundled with the skill, not in D1 — it
+    changes with the estate, is read by an LLM rather than queried, and the dashboard has no use
+    for it. Account ids ship as `<PLACEHOLDER>` for an operator to fill in.
+
 ### Changed
 - **Docs: rewrote `README.md` for readability.** Restructured into a quick-start plus a
   scannable skills table, documented the two previously-missing skills (`aws-firewall-review`,
