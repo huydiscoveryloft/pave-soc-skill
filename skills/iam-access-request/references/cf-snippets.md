@@ -53,7 +53,7 @@ async () => {
     sql:`INSERT INTO iam_requests
            (id, created_at, updated_at, requester, source_type, source_ref, title,
             identity_type, suggestion_json, setup_steps_md, assumptions_md,
-            discovery_evidence_md, placeholders_json, crosscheck_instruction_md,
+            discovery_evidence_md, placeholders_json, challenge_prompt_md,
             reviewer_snapshot, status)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`,
     params:[
@@ -65,7 +65,7 @@ async () => {
       JSON.stringify(suggestion),
       "<SETUP_STEPS_MD>", "<ASSUMPTIONS_MD>", "<DISCOVERY_EVIDENCE_MD>",
       JSON.stringify(["<PLACEHOLDER_NAME>"]),   // [] when nothing is unresolved
-      "<CROSSCHECK_INSTRUCTION_MD>",
+      "<CHALLENGE_PROMPT_MD>",
       JSON.stringify(reviewers),
     ] }});
 }
@@ -96,7 +96,7 @@ async () => {
 }
 ```
 
-## 3. Read one request — before discovery, and before writing a guide
+## 3. Read one request — before discovery, a challenge session, or writing a guide
 
 ```js
 async () => {
@@ -105,6 +105,7 @@ async () => {
   const res = await cloudflare.request({ method:"POST", path, body:{
     sql:`SELECT id, title, status, identity_type, suggestion_json, placeholders_json,
                 assumptions_md, discovery_evidence_md, reviewer_snapshot,
+                challenge_prompt_md,
                 guide_md IS NOT NULL AS has_guide
          FROM iam_requests WHERE id=?`,
     params:["<UUID>"] }});

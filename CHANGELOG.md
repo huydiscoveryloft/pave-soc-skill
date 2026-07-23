@@ -8,6 +8,38 @@ Changelog; versions track `.claude-plugin/plugin.json`.
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-07-23
+
+### Changed
+- **`iam-access-request`: the cross-check prompt becomes a challenge briefing.** The operator test
+  found it was the wrong artifact — written as a one-shot *"review this and return a verdict"*
+  request, and at 11.7 KB nobody reads it that way.
+  - It is now a **portable context bundle** a reviewer downloads and interrogates: *can this role
+    reach production?*, *if the credential leaks, what is the blast radius?*, *is there an
+    escalation path?* A briefing, not a verdict request.
+  - **That changes what it must contain.** A verdict request needs the policy and the ask; an
+    interrogable briefing also needs the relevant slice of **estate context** — which account the
+    identity lives in, what else runs there, what trusts what — or a blast-radius question cannot
+    be answered at all. `references/challenge-prompt.md` (replaces `crosscheck-prompt.md`)
+    specifies the shape.
+  - Column names follow the vocabulary: `challenge_prompt_md` and `challenge_findings`
+    (webapp migration `0013`). Leaving the old names would make every future reader translate
+    between two vocabularies.
+
+### Added
+- **`/iam-access-request challenge <id|file>`** — a fourth subcommand that answers questions about
+  a request. Read-only: it writes nothing, approves nothing, and touches no AWS.
+  - **Takes a downloaded file as well as a request id**, and the file form is the point: a
+    reviewer can run the briefing in a session with no access to this estate, no Cloudflare MCP
+    and no AWS, in a different model than the one that drafted the policy.
+  - Told to ground every answer in the briefing, to name the missing fact rather than assume the
+    reassuring case, to treat any answer about a `<PLACEHOLDER>` as provisional, and **not to
+    soften findings to be agreeable** — a challenge session that agrees with everything is worth
+    nothing.
+  - Offers to summarise what the session surfaced for pasting into the dashboard's *Challenge
+    findings* field, but never submits the review: approval is the human's, made where the Access
+    JWT identifies them.
+
 ## [0.21.0] — 2026-07-23
 
 ### Changed

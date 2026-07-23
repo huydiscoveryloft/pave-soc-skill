@@ -1,23 +1,25 @@
 ---
 name: iam-access-request
-description: Turn an AWS access request from Slack or Jira into a reviewed, least-privilege IAM suggestion on the SOC dashboard, then generate its setup guide once approved. Invoke with /iam-access-request followed by a Slack permalink or Jira key (e.g. /iam-access-request PDO-286), or a subcommand — "/iam-access-request discovery" plus a request id to resolve placeholder ARNs against the real AWS estate, and "/iam-access-request guide" plus a request id to write the setup guide for an approved request. Use this WHENEVER someone asks for AWS access, permissions, an IAM role, an IAM user, a policy, or "access to" an AWS resource — even if they do not say IAM — and whenever the user asks to draft, review, or cross-check an IAM policy for least privilege. Drafts the identity plus a least-privilege policy, records its assumptions, emits a self-contained cross-check prompt for an external LLM, and uploads the request to the dashboard where configured reviewers approve it unanimously.
+description: Turn an AWS access request from Slack or Jira into a reviewed, least-privilege IAM suggestion on the SOC dashboard, then generate its setup guide once approved. Invoke with /iam-access-request followed by a Slack permalink or Jira key (e.g. /iam-access-request PDO-286), or a subcommand — "/iam-access-request discovery" plus a request id to resolve placeholder ARNs against the real AWS estate, "/iam-access-request challenge" plus a request id or the path to a downloaded challenge briefing to answer questions about a request (can this role reach production, what is the blast radius if its credentials leak, is there an escalation path), and "/iam-access-request guide" plus a request id to write the setup guide for an approved request. Use this WHENEVER someone asks for AWS access, permissions, an IAM role, an IAM user, a policy, or "access to" an AWS resource — even if they do not say IAM — and whenever the user asks to draft, review, challenge, or assess the blast radius of an IAM policy. Drafts the identity plus a least-privilege policy, records its assumptions, emits a portable challenge briefing, and uploads the request to the dashboard where configured reviewers approve it unanimously.
 ---
 
 # IAM Access Request
 
 Turns "please give me access to X" into an auditable, least-privilege change: a drafted
 identity + policy, an explicit list of what was assumed, evidence from the real AWS estate, a
-second-opinion prompt, unanimous human approval, and only then a setup guide.
+briefing a reviewer can interrogate, unanimous human approval, and only then a setup guide.
 
 ```
 Slack message / Jira ticket
    │  /iam-access-request <link|KEY>
    ▼
-draft: identity + policy + assumptions + cross-check prompt   (placeholders allowed)
+draft: identity + policy + assumptions + challenge briefing   (placeholders allowed)
    │  INSERT into D1 `iamreq` via the Cloudflare MCP
    ▼
 Dashboard ▸ Cloud Security ▸ IAM access request
    │  /iam-access-request discovery <id>   ← resolve <PLACEHOLDER> ARNs, re-upload
+   │  reviewer downloads the challenge briefing and interrogates it, anywhere:
+   │    /iam-access-request challenge <file>  ← "can this reach production?"
    │  reviewers approve or reject in the dashboard (unanimous; one reject closes it)
    ▼  status = approved
 /iam-access-request guide <id>  → policy JSON + aws cli written to guide_md
@@ -73,12 +75,13 @@ connector. Do not "be careful instead".
 > a read-only role, or carry an explicit `Deny` on `iam:*` writes. Treat everything here as the
 > second layer, and say so if a user assumes the skill is the guarantee.
 
-## The three subcommands
+## The four subcommands
 
 | Invocation | Does |
 |---|---|
 | `/iam-access-request <slack-link\|JIRA-KEY>` | Read the source, draft the request, upload it |
 | `/iam-access-request discovery <id>` | Resolve `<PLACEHOLDER>` identifiers against real AWS, regenerate the policy, update the row |
+| `/iam-access-request challenge <id\|file>` | Answer questions about a request from its briefing. Read-only |
 | `/iam-access-request guide <id>` | **Only if `status = approved`** — write the setup guide onto the row |
 
 If the user just says "someone needs access to X" with no link, draft from what they tell you —
@@ -144,15 +147,22 @@ as a literal `<PLACEHOLDER_NAME>` — e.g. `<CUR_BUCKET_ARN>` — and is listed 
 gap:** the gap gets fixed, the wrong ARN gets applied. Resolve them with `discovery`, not with
 inference.
 
-### The cross-check prompt
+### The challenge briefing
 
-Write `crosscheck_instruction_md` as a **self-contained** prompt: a reviewer pastes it into
-whatever external model they trust, with no other context available. It must embed the original
-request, the drafted policy, the assumptions and the discovery evidence inline. See
-`references/crosscheck-prompt.md` for the required shape.
+Write `challenge_prompt_md` as a **portable context bundle**, not a request for a verdict. A
+reviewer downloads it from the dashboard and hands it to whatever LLM they trust, which must then
+be able to answer questions about the request — *can this role reach production?*, *if the
+credential leaks, what is the blast radius?*, *is there an escalation path out of here?*
 
-Use a *different* model than the one that drafted the policy — that is the entire value of the
-step, and it is why the platform stores a pasted verdict rather than calling a model itself.
+That means it carries the original ask, the drafted identity and both policies, the assumptions,
+the discovery evidence, the unresolved placeholders, the deliberate exclusions — **and the slice
+of estate context those questions need**: which account this lives in, what else runs there, and
+what trusts what. A briefing without that cannot answer a blast-radius question at all, which is
+what made the first version unusable.
+
+See `references/challenge-prompt.md` for the required shape. Tell the reader, in the opening line,
+to use a *different* model than the one that drafted the policy — a model reviewing its own output
+agrees with itself.
 
 ### Upload
 
@@ -201,7 +211,55 @@ Discovery does **not** change `status`, `reviewer_snapshot`, or any review rows.
 
 ---
 
-## 3. Guide — `/iam-access-request guide <id>`
+## 3. Challenge — `/iam-access-request challenge <id|file>`
+
+Answer questions about a request. **Read-only, always** — this subcommand writes nothing: not D1,
+not AWS, not a review. It exists so a reviewer can interrogate a proposal before approving it.
+
+Two ways in, and both must work:
+
+- **`challenge <request-id>`** — read the row from D1 (snippet 3 in `references/cf-snippets.md`,
+  which returns `challenge_prompt_md`) and work from that.
+- **`challenge <path-to-file>`** — the briefing downloaded from the dashboard. **This is the
+  important one.** The point of a portable briefing is that a reviewer can run it in a session
+  with no access to this estate, no Cloudflare MCP and no AWS — including a different model than
+  the one that drafted the policy. If you are handed a file, work only from it and say so when it
+  does not contain enough to answer.
+
+### How to answer
+
+Open with a two-line orientation — what identity, in which account, at what status — then take
+questions. Typical ones, and what a good answer looks like:
+
+- **"Can this reach production?"** Trace it: what the policy allows, what the trust policy lets
+  assume it, whether any resource ARN or wildcard crosses an account boundary. Name the path, or
+  say plainly that nothing in the briefing grants it.
+- **"What is the blast radius if the credentials leak?"** Enumerate concretely — which resources,
+  read or write, in which account — and separate what the identity can do *directly* from what it
+  can reach by assuming something else.
+- **"Is there an escalation path?"** Look for `iam:PassRole`, policy-attachment actions, `sts`
+  permissions, and write access to anything that runs code with a role attached.
+- **"Is this least privilege?"** Compare the granted actions against the stated need, and name
+  specific statements rather than judging the policy as a whole.
+
+**Ground every answer in the briefing.** If the answer depends on something not written there — a
+resource policy, an SCP, what a bucket actually contains — say which fact is missing rather than
+assuming the reassuring case. `<PLACEHOLDER>` values mean the real scope is still unknown, and any
+answer about them is provisional; say that too.
+
+**Do not soften the finding to be agreeable.** A reviewer running this is trying to find the
+problem, and a challenge session that agrees with everything is worth nothing.
+
+### After the questions
+
+Offer to summarise what the session surfaced, in a form the reviewer can paste into the
+dashboard's **Challenge findings** field on their review. Do not paste it for them and do not
+submit the review — approval is theirs, made in the dashboard where the Access JWT identifies
+them.
+
+---
+
+## 4. Guide — `/iam-access-request guide <id>`
 
 **Refuse unless `status = approved`.** Read the row first and check. A guide for a `pending`
 request invites someone to apply an unreviewed policy; for a `rejected` one it is worse. Say
@@ -221,7 +279,7 @@ guide into chat — link the dashboard and summarise.
 
 ---
 
-## Rules that hold across all three
+## Rules that hold across all four
 
 - **Never write AWS state, and never execute the setup guide.** See *Hard limits* above for the
   deny list and why the environment's egress restrictions are not the safeguard. The deliverable
@@ -238,7 +296,7 @@ guide into chat — link the dashboard and summarise.
 
 Requests appear at **Cloud Security ▸ IAM access request** on
 `https://dashboard.aisoc.center/cloud-security/iam-access-request`. Reviewers approve or reject
-there; the page shows the policy, assumptions, discovery evidence, cross-check prompt, per-
+there; the page shows the policy, assumptions, discovery evidence, challenge briefing, per-
 reviewer status, and the guide download once generated.
 
 ## References
@@ -248,4 +306,4 @@ reviewer status, and the guide download once generated.
 | `references/system-facts.md` | Estate facts that change what a draft should say: accounts, what runs where, the placement rule. **Read before drafting.** Facts only — no status, no dates. |
 | `references/cf-snippets.md` | Exact Cloudflare MCP calls for insert / discovery update / guide write |
 | `references/d1-schema.sql` | The `iamreq` schema this skill writes (mirror of the dashboard's migration `0012`) |
-| `references/crosscheck-prompt.md` | Required shape of the self-contained cross-check prompt |
+| `references/challenge-prompt.md` | Required shape of the portable challenge briefing |

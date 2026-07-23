@@ -1,5 +1,5 @@
 -- iam_* — the SOC dashboard's IAM access request tables.
--- Mirror of pentest-dashboard/migrations/0012_iamreq.sql. Lives in its OWN D1 database
+-- Mirror of pentest-dashboard/migrations/0012_iamreq.sql + 0013_iamreq_challenge.sql. Lives in its OWN D1 database
 -- `iamreq` (id 0d85d6ea-fcc9-445e-8a8e-85c55a43401d). The iam-access-request skill WRITES
 -- iam_requests via the Cloudflare MCP; the dashboard Worker reads it AND owns every write to
 -- iam_reviews (approval is a human act, with the reviewer identity taken from the Access JWT).
@@ -27,7 +27,7 @@ CREATE TABLE iam_requests (
   assumptions_md            TEXT,
   discovery_evidence_md     TEXT,
   placeholders_json         TEXT,
-  crosscheck_instruction_md TEXT,
+  challenge_prompt_md       TEXT,
   reviewer_snapshot         TEXT NOT NULL,
   status                    TEXT NOT NULL DEFAULT 'pending'
                             CHECK (status IN ('pending','approved','rejected')),
@@ -41,7 +41,7 @@ CREATE TABLE iam_reviews (
   request_id         TEXT NOT NULL,
   reviewer_email     TEXT NOT NULL,
   decision           TEXT NOT NULL CHECK (decision IN ('approved','rejected')),
-  crosscheck_verdict TEXT,
+  challenge_findings TEXT,
   comment             TEXT,
   decided_at         INTEGER NOT NULL,
   PRIMARY KEY (request_id, reviewer_email)
