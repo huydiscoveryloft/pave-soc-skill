@@ -12,6 +12,7 @@ Each capability is a self-contained skill under `skills/`. New skills drop in wi
 | Alert triage | `/alert-triage <alert-id>` | A True/False Positive verdict on a single alert, with an optional ISO 27001 incident report |
 | Track user | `/track-user <username> [window]` | A chronological timeline of one AWS user's sign-ins and changes |
 | AWS firewall review | `/aws-firewall-review` | A quarterly security-group audit flagging internet-exposed ports and permissive rules |
+| IAM access request | `/iam-access-request <link\|KEY>` | A least-privilege IAM draft from a Slack/Jira request, reviewed and approved on the SOC dashboard |
 | Web-app pentest | `/webapp-pentest <url>` | An authorized OWASP Top 10 pentest run by an agent team, with a consolidated report |
 | Pentest job runner | `/pentest-job-runner` | Drains one queued pentest from the Cloudflare job queue and reports status to the dashboard |
 
@@ -55,6 +56,18 @@ Collects every AWS security group via a read-only Dockerised MCP collector, then
 
 ```
 /aws-firewall-review
+```
+
+### iam-access-request
+Turns an AWS access request from Slack or Jira into a reviewed, least-privilege IAM change. It drafts the identity and policy, records every assumption it had to make, resolves real ARNs through read-only AWS discovery, and emits a self-contained cross-check prompt for a *different* model to second-guess the policy. The request lands on the SOC dashboard, where configured reviewers approve it unanimously — one reject closes it — and only then will the skill write the setup guide.
+
+**It drafts and evidences; it never grants and never approves.** No AWS state is written at any point, identifiers it cannot confirm stay `<PLACEHOLDER>` rather than being guessed, and approvals belong to humans in the dashboard, where the reviewer's identity comes from the Access JWT.
+
+```
+/iam-access-request PDO-286                    # from a Jira issue
+/iam-access-request https://…slack.com/archives/…  # from a Slack thread
+/iam-access-request discovery <id>             # resolve placeholder ARNs (read-only)
+/iam-access-request guide <id>                 # approved requests only
 ```
 
 ### webapp-pentest
